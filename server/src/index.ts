@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
@@ -64,10 +65,11 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// In production, serve the built frontend (client/dist) from the same Express app.
-// Render's free tier allows one web service, so the API and the SPA share an origin.
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '../../client/dist');
+// Serve the built frontend (client/dist) from the same Express app whenever it
+// exists. Render's free tier allows one web service, so the API and the SPA
+// share an origin — this works regardless of how NODE_ENV is configured.
+const distPath = path.join(__dirname, '../../client/dist');
+if (fs.existsSync(path.join(distPath, 'index.html'))) {
   app.use(express.static(distPath));
 
   // SPA fallback: any GET that isn't an API route serves index.html

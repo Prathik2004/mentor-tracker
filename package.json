@@ -7,8 +7,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "install:all": "npm --prefix server install --include=dev && npm --prefix client install --include=dev",
-    "postinstall": "npm run install:all",
+    "install:all": "npm --prefix server ci --include=dev && npm --prefix client ci --include=dev",
     "build": "npm run install:all && npm --prefix client run build && npm --prefix server run build",
     "start": "npm --prefix server run start",
     "dev": "npm --prefix server run dev"
