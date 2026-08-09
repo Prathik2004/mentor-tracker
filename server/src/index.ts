@@ -21,28 +21,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(cors());
 app.use(helmet({ crossOriginResourcePolicy: false }));
-
-// Frontend origin(s) allowed to call the API. Set CLIENT_URL in server/.env to
-// your deployed frontend URL (comma-separated for multiple). When unset, CORS
-// stays open for local development and same-origin production serving.
-const clientUrls = (process.env.CLIENT_URL ?? '')
-  .split(',')
-  .map(url => url.trim().replace(/\/+$/, ''))
-  .filter(Boolean);
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      // No Origin header (curl, uptime/health checks) — always allow.
-      if (!origin) return callback(null, true);
-      // No CLIENT_URL configured → allow every origin (dev / same-origin).
-      if (clientUrls.length === 0) return callback(null, true);
-      // Otherwise only the configured frontend origin(s) get CORS headers.
-      callback(null, clientUrls.includes(origin));
-    },
-  })
-);
 app.use(express.json());
 
 app.use('/api/students', studentsRouter);
