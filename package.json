@@ -2,14 +2,13 @@
   "name": "mentor-tracker",
   "version": "1.0.0",
   "private": true,
-  "description": "Mentor Class & Earnings Management — API + React PWA served from one Express app",
+  "description": "Mentor Class & Earnings Management",
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
-    "install:all": "npm --prefix server ci --include=dev && npm --prefix client ci --include=dev",
-    "build": "npm run install:all && npm --prefix client run build && npm --prefix server run build",
-    "start": "npm --prefix server run start",
-    "dev": "npm --prefix server run dev"
+    "dev": "npm --prefix server run dev",
+    "build": "npm --prefix client install && npm --prefix server install && npm --prefix client run build && npm --prefix server run build",
+    "start": "node server/dist/index.js"
   }
 }

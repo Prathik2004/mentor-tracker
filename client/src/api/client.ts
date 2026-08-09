@@ -1,11 +1,4 @@
-// Base URL of the backend API.
-// Set VITE_API_URL in client/.env to the deployed backend origin (no trailing
-// slash, no /api path), e.g. VITE_API_URL=https://mentor-tracker-backend.onrender.com
-// When unset, falls back to same-origin '/api' — the mode where the Express
-// server also serves the built frontend.
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api`
-  : '/api';
+const API_BASE = '/api';
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
