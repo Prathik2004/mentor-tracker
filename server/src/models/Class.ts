@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IClass extends Document {
   date: Date;
   studentId?: mongoose.Types.ObjectId | null;
+  /** Start time of the class as "HH:MM" (24h). Optional. */
+  time?: string | null;
   classType: 'regular' | 'demo' | 'substitute' | 'ptm';
   status: 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled';
   schedulingType: 'scheduled' | 'on_spot';
@@ -25,14 +27,15 @@ export interface IClass extends Document {
 
 const ClassSchema = new Schema({
   date: { type: Date, required: true },
+  time: { type: String, trim: true, default: null },
   studentId: {
     type: Schema.Types.ObjectId,
     ref: 'Student',
     default: null,
-    // A student is required for all class types except demo
-    required: function (this: any) {
-      return this.classType !== 'demo';
-    },
+    // No schema-level `required`: a function-based required validator breaks
+    // update validation (findByIdAndUpdate's runValidators sees `this` as the
+    // Query, not the doc, so this.classType is always undefined). The routes
+    // enforce "student required unless demo/substitute" instead.
   },
   classType: {
     type: String,

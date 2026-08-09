@@ -51,20 +51,20 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { date, studentId, classType, status, schedulingType, notes, confirmDuplicate } = req.body;
+    const { date, time, studentId, classType, status, schedulingType, notes, confirmDuplicate } = req.body;
 
     if (!date || !classType || !status || !schedulingType) {
       return res.status(400).json({ error: 'All required fields must be provided' });
     }
 
-    // A student is required for all class types except demo
-    if (classType !== 'demo' && !studentId) {
-      return res.status(400).json({ error: 'studentId is required for non-demo classes' });
+    // A student is required for all class types except demo and substitute
+    if (classType !== 'demo' && classType !== 'substitute' && !studentId) {
+      return res.status(400).json({ error: 'studentId is required for non-demo, non-substitute classes' });
     }
 
     const classDate = new Date(date);
 
-    // Duplicate check (demo classes without a student are matched by type/status/date)
+    // Duplicate check (demo/substitute classes without a student are matched by type/status/date)
     if (!confirmDuplicate) {
       const startOfDay = new Date(classDate);
       startOfDay.setHours(0, 0, 0, 0);
@@ -94,6 +94,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     const classRecord = new Class({
       date: classDate,
+      time: time || null,
       studentId,
       classType,
       status,
@@ -112,15 +113,25 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { date, classType, status } = req.body;
+    const { date, classType, status, studentId } = req.body;
     const updates: any = { ...req.body };
 
-    if (date || classType || status) {
-      const existing = await Class.findById(req.params.id);
-      if (!existing) return res.status(404).json({ error: 'Class not found' });
+    // Normalize an emptied time field to null so it can be cleared on edit.
+    if (updates.time !== undefined) updates.time = updates.time || null;
 
+    const existing = await Class.findById(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Class not found' });
+
+    // A student is required for all class types except demo and substitute.
+    // Evaluated against the effective (new or existing) class type.
+    const effectiveClassType = classType || existing.classType;
+    if (effectiveClassType !== 'demo' && effectiveClassType !== 'substitute' && studentId == null) {
+      return res.status(400).json({ error: 'studentId is required for non-demo, non-substitute classes' });
+    }
+
+    if (date || classType || status) {
       const classDate = date ? new Date(date) : existing.date;
-      const cType = classType || existing.classType;
+      const cType = effectiveClassType;
       const cStatus = status || existing.status;
 
       const calculated = await buildClassRecord(classDate, cType, cStatus);

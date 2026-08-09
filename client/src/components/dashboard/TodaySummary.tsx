@@ -22,7 +22,7 @@ export function TodaySummary({ classes, earnings }: { classes: ClassRecord[]; ea
             {classes.slice(0, 5).map(cls => (
               <li key={cls._id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{getStudentName(cls.studentId)}</p>
+                  <p className="text-sm font-medium text-slate-900 truncate">{getStudentName(cls.studentId, cls.classType)}</p>
                   <p className="text-xs text-slate-500">
                     {formatDate(cls.date)} · {CLASS_TYPE_LABELS[cls.classType]} · {CLASS_STATUS_LABELS[cls.status]}
                   </p>

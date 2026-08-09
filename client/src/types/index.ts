@@ -12,6 +12,8 @@ export interface Student {
 export interface ClassRecord {
   _id: string;
   date: string;
+  /** Start time of the class as "HH:MM" (24h). Optional. */
+  time: string | null;
   studentId: Student | string | null;
   classType: ClassType;
   status: ClassStatus;
@@ -122,6 +124,8 @@ export interface ClassesResponse {
 
 export interface CreateClassInput {
   date: string;
+  /** Start time of the class as "HH:MM" (24h). Optional. */
+  time?: string | null;
   studentId: string | null;
   classType: ClassType;
   status: ClassStatus;

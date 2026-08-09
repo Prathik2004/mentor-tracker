@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { classesApi } from '@/api/classes'
 import type { ClassRecord } from '@/types'
 import { CLASS_TYPE_LABELS, CLASS_STATUS_LABELS, SCHEDULING_TYPE_LABELS, CLASS_TYPE_COLORS } from '@/types'
-import { formatDate, formatCurrency, formatMonth, getStudentName } from '@/utils/format'
+import { formatDate, formatCurrency, formatMonth, formatTime, getStudentName } from '@/utils/format'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -17,14 +17,14 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/toast'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Clock, Pencil, Trash2 } from 'lucide-react'
 
 export function ClassCard({ classRecord, onEdit }: { classRecord: ClassRecord; onEdit?: (cls: ClassRecord) => void }) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const cls = classRecord
-  const studentName = getStudentName(cls.studentId)
+  const studentName = getStudentName(cls.studentId, cls.classType)
 
   const deleteClass = useMutation({
     mutationFn: () => classesApi.delete(cls._id),
@@ -51,7 +51,16 @@ export function ClassCard({ classRecord, onEdit }: { classRecord: ClassRecord; o
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-semibold text-slate-900 truncate">{studentName}</p>
-                <p className="text-xs text-slate-500">{formatDate(cls.date)}</p>
+                <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                  {formatDate(cls.date)}
+                  {cls.time && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-slate-300">·</span>
+                      <Clock className="h-3 w-3" />
+                      {formatTime(cls.time)}
+                    </span>
+                  )}
+                </p>
               </div>
               <span className="text-lg font-bold text-slate-900 shrink-0">{formatCurrency(cls.paymentAmount)}</span>
             </div>

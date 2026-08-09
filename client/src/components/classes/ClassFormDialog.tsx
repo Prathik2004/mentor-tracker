@@ -55,6 +55,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const isEdit = !!initialClass
 
   const [date, setDate] = useState(todayISO())
+  const [time, setTime] = useState('')
   const [studentId, setStudentId] = useState('')
   const [classType, setClassType] = useState<ClassType>()
   const [status, setStatus] = useState<ClassStatus>()
@@ -70,6 +71,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     if (!open) return
     if (initialClass) {
       setDate(toDateInputValue(initialClass.date))
+      setTime(initialClass.time || '')
       setStudentId(getStudentId(initialClass))
       setClassType(initialClass.classType)
       setStatus(initialClass.status)
@@ -101,6 +103,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     mutationFn: () => {
       const payload = {
         date,
+        time: time || null,
         studentId: studentId || null,
         classType: classType!,
         status: status!,
@@ -133,6 +136,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
 
   function resetForm() {
     setDate(todayISO())
+    setTime('')
     setStudentId('')
     setClassType(undefined)
     setStatus(undefined)
@@ -142,7 +146,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     setDuplicateConfirm(false)
   }
 
-  const canSubmit = !!date && !!classType && !!status && !!schedulingType && (classType === 'demo' ? true : !!studentId)
+  const canSubmit = !!date && !!classType && !!status && !!schedulingType && (classType === 'demo' || classType === 'substitute' ? true : !!studentId)
 
   const selectedStudent = students?.find(s => s._id === studentId)
 
@@ -154,22 +158,34 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Date */}
-          <div>
-            <Label htmlFor="class-date">Date</Label>
-            <Input
-              id="class-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="mt-1.5"
-            />
+          {/* Date + From time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="class-date">Date</Label>
+              <Input
+                id="class-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
+            <div>
+              <Label htmlFor="class-time">From time</Label>
+              <Input
+                id="class-time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
           </div>
 
           {/* Student selector */}
           <div>
             <Label>
-              Student{classType === 'demo' && <span className="text-xs font-normal text-slate-400"> (optional for demo)</span>}
+              Student{(classType === 'demo' || classType === 'substitute') && <span className="text-xs font-normal text-slate-400"> (optional for demo/substitute)</span>}
             </Label>
             {selectedStudent ? (
               <div className="mt-1.5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
