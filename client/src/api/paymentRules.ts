@@ -6,5 +6,5 @@ export const paymentRulesApi = {
   update: (data: { classType: string; status: string; amount: number }) =>
     api.put<PaymentRule>('/payment-rules', data),
   calculate: (classType: string, status: string, date: string) =>
-    api.get<{ amount: number }>(`/payment-rules/calculate?classType=${classType}&status=${status}&date=${date}`),
+    api.get<{ amount: number; regularAmount?: number; ptmAmount?: number }>(`/payment-rules/calculate?classType=${classType}&status=${status}&date=${date}`),
 };

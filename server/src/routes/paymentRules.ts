@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import PaymentRule from '../models/PaymentRule';
 import Class from '../models/Class';
-import { getApplicablePaymentRule } from '../utils/paymentCalculator';
+import { getApplicablePaymentRule, calculateClassPayment } from '../utils/paymentCalculator';
 
 const router = Router();
 
@@ -85,29 +85,17 @@ router.get('/calculate', async (req: Request, res: Response) => {
 
     const classDate = date ? new Date(date as string) : new Date();
 
-    if (status === 'cancelled' || status === 'rescheduled') {
-      return res.json({ amount: 0, rule: null });
-    }
-
-    const rule = await getApplicablePaymentRule(
+    const result = await calculateClassPayment(
       classType as string,
       status as string,
       classDate
     );
 
-    if (!rule) {
-      return res.json({ amount: 0, rule: null, message: 'No applicable payment rule found' });
-    }
-
     res.json({
-      amount: rule.amount,
-      rule: {
-        classType: rule.classType,
-        status: rule.status,
-        amount: rule.amount,
-        ruleId: rule._id.toString(),
-        effectiveFrom: rule.effectiveFrom,
-      }
+      amount: result.amount,
+      rule: result.rule,
+      regularAmount: result.regularAmount,
+      ptmAmount: result.ptmAmount,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to calculate payment' });

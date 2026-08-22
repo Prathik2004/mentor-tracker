@@ -60,13 +60,37 @@ export async function calculateClassPayment(
   classDate: Date
 ) {
   if (status === 'cancelled' || status === 'rescheduled') {
-    return { amount: 0, rule: null };
+    return { amount: 0, rule: null, regularAmount: 0, ptmAmount: 0 };
+  }
+
+  // PTM means "Regular class + PTM" — combine both payment rules.
+  if (classType === 'ptm') {
+    const [regularRule, ptmRule] = await Promise.all([
+      getApplicablePaymentRule('regular', status, classDate),
+      getApplicablePaymentRule('ptm', status, classDate),
+    ]);
+
+    const regularAmount = regularRule?.amount ?? 0;
+    const ptmAmount = ptmRule?.amount ?? 0;
+    const totalAmount = regularAmount + ptmAmount;
+
+    return {
+      amount: totalAmount,
+      rule: ptmRule ? {
+        classType: 'ptm',
+        status: ptmRule.status,
+        amount: totalAmount,
+        ruleId: ptmRule._id.toString()
+      } : null,
+      regularAmount,
+      ptmAmount,
+    };
   }
 
   const rule = await getApplicablePaymentRule(classType, status, classDate);
 
   if (!rule) {
-    return { amount: 0, rule: null };
+    return { amount: 0, rule: null, regularAmount: 0, ptmAmount: 0 };
   }
 
   return {
@@ -76,7 +100,9 @@ export async function calculateClassPayment(
       status: rule.status,
       amount: rule.amount,
       ruleId: rule._id.toString()
-    }
+    },
+    regularAmount: 0,
+    ptmAmount: 0,
   };
 }
 

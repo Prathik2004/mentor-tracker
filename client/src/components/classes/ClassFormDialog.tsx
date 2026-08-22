@@ -182,6 +182,21 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
             </div>
           </div>
 
+          {/* Class Type */}
+          <div>
+            <Label>Class Type</Label>
+            <Select value={classType} onValueChange={(v) => setClassType(v as ClassType)}>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CLASS_TYPE_LABELS) as ClassType[]).map((t) => (
+                  <SelectItem key={t} value={t}>{CLASS_TYPE_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Student selector */}
           <div>
             <Label>
@@ -233,21 +248,6 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
 
             </div>
 
-          {/* Class Type */}
-          <div>
-            <Label>Class Type</Label>
-            <Select value={classType} onValueChange={(v) => setClassType(v as ClassType)}>
-              <SelectTrigger className="mt-1.5">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(CLASS_TYPE_LABELS) as ClassType[]).map((t) => (
-                  <SelectItem key={t} value={t}>{CLASS_TYPE_LABELS[t]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Status */}
           <div>
             <Label>Status</Label>
@@ -297,6 +297,11 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
                 {isEdit ? 'Estimated Earnings (current rules)' : 'Estimated Earnings'}
               </p>
               <p className="text-2xl font-bold text-green-700">{Number(estimate.amount).toLocaleString('en-IN')}</p>
+              {classType === 'ptm' && estimate.regularAmount != null && estimate.ptmAmount != null && (
+                <p className="text-xs text-green-600 mt-1">
+                  Regular: ₹{Number(estimate.regularAmount).toLocaleString('en-IN')} + PTM: ₹{Number(estimate.ptmAmount).toLocaleString('en-IN')}
+                </p>
+              )}
               <p className="text-xs text-green-600">{formatMonth(getMonthFromDate(date))}</p>
             </div>
           )}

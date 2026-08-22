@@ -175,7 +175,7 @@ export const CLASS_TYPE_LABELS: Record<ClassType, string> = {
   regular: 'Regular',
   demo: 'Demo',
   substitute: 'Substitute',
-  ptm: 'PTM',
+  ptm: 'Regular + PTM',
 };
 
 export const CLASS_STATUS_LABELS: Record<ClassStatus, string> = {
