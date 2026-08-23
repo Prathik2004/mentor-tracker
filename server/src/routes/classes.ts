@@ -6,6 +6,20 @@ import { recalculateStudentIncentives } from '../utils/incentiveCalculator';
 
 const router = Router();
 
+async function getNextClassNumber(studentId: string, excludeId?: string) {
+  const filter: any = { studentId, deletedAt: null, class_no: { $ne: null } };
+  if (excludeId) filter._id = { $ne: excludeId };
+  const latest = await Class.findOne(filter).sort({ class_no: -1 }).select('class_no').lean();
+  const highestClassNo = latest?.class_no ?? 0;
+  const existingNumbers = await Class.find({ ...filter, class_no: { $lte: highestClassNo } })
+    .select('class_no')
+    .lean();
+  const existingNumberSet = new Set(existingNumbers.map((classRecord) => classRecord.class_no));
+  const missingClassNumbers = Array.from({ length: highestClassNo }, (_, index) => index + 1)
+    .filter((classNo) => !existingNumberSet.has(classNo));
+  return { nextClassNo: highestClassNo + 1, highestClassNo, missingClassNumbers };
+}
+
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { month, classType, status, schedulingType, studentId, search, startDate, endDate, page = '1', limit = '50' } = req.query;
@@ -53,6 +67,15 @@ router.get('/', async (req: Request, res: Response) => {
     res.json({ classes, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch classes' });
+  }
+});
+
+router.get('/student/:studentId/next-number', async (req: Request, res: Response) => {
+  try {
+    const result = await getNextClassNumber(String(req.params.studentId));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to determine next class number' });
   }
 });
 
@@ -108,6 +131,22 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const calculated = await buildClassRecord(classDate, classType, status);
+    const classNumber = studentId && status === 'completed'
+      ? (await getNextClassNumber(studentId)).nextClassNo
+      : null;
+    if (classNumber !== null) {
+      const duplicateClassNumber = await Class.exists({
+        studentId,
+        class_no: classNumber,
+        deletedAt: null,
+      });
+      if (duplicateClassNumber) {
+        return res.status(409).json({
+          warning: 'duplicate-class-number',
+          message: `Class number ${classNumber} already exists for this student. Please try again.`,
+        });
+      }
+    }
 
     const classRecord = new Class({
       date: classDate,
@@ -117,6 +156,7 @@ router.post('/', async (req: Request, res: Response) => {
       status,
       schedulingType,
       notes,
+      class_no: classNumber,
       ...calculated
     });
 
@@ -133,6 +173,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { date, classType, status, studentId } = req.body;
     const updates: any = { ...req.body };
+    delete updates.class_no;
 
     // Normalize an emptied time field to null so it can be cleared on edit.
     if (updates.time !== undefined) updates.time = updates.time || null;
@@ -154,6 +195,10 @@ router.put('/:id', async (req: Request, res: Response) => {
 
       const calculated = await buildClassRecord(classDate, cType, cStatus);
       Object.assign(updates, calculated);
+    }
+
+    if (studentId !== undefined && String(studentId || '') !== String(existing.studentId || '')) {
+      updates.class_no = null;
     }
 
     const classRecord = await Class.findByIdAndUpdate(

@@ -75,6 +75,7 @@ const ClassSchema = new Schema({
 
 ClassSchema.index({ date: -1 });
 ClassSchema.index({ studentId: 1, date: -1 });
+ClassSchema.index({ studentId: 1, class_no: 1, deletedAt: 1 });
 ClassSchema.index({ classMonth: 1 });
 ClassSchema.index({ classType: 1 });
 ClassSchema.index({ deletedAt: 1 });

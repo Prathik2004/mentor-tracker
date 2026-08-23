@@ -20,6 +20,8 @@ export interface ClassRecord {
   status: ClassStatus;
   schedulingType: SchedulingType;
   paymentAmount: number;
+  regularPaymentAmount: number;
+  ptmPaymentAmount: number;
   paymentRuleSnapshot: {
     classType: string;
     status: string;

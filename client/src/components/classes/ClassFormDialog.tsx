@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select'
 import { AddStudentDialog } from '@/components/students/AddStudentDialog'
 import { useToast } from '@/components/ui/toast'
-import { Search, UserPlus, X } from 'lucide-react'
+import { AlertTriangle, Search, UserPlus, X } from 'lucide-react'
 
 function todayISO(): string {
   const d = new Date()
@@ -153,16 +153,12 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
 
   const selectedStudent = students?.find(s => s._id === studentId)
 
-  const { data: previousClasses } = useQuery({
-    queryKey: ['classes', 'student-class-numbers', studentId],
-    queryFn: () => classesApi.getAll({ studentId, status: 'completed', limit: 1000 }),
+  const { data: nextClassNumber } = useQuery({
+    queryKey: ['classes', 'next-class-number', studentId],
+    queryFn: () => classesApi.getNextClassNumber(studentId),
     enabled: !!studentId && !isEdit,
   })
-  const lastClassNo = previousClasses?.classes.reduce(
-    (highest, classRecord) => Math.max(highest, classRecord.class_no ?? 0),
-    0
-  ) ?? 0
-  const displayedClassNo = isEdit ? classNo : lastClassNo + 1
+  const displayedClassNo = isEdit ? classNo : nextClassNumber?.nextClassNo ?? ''
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false) }}>
@@ -265,6 +261,12 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
           <div>
             <Label htmlFor="class-number">Class No.</Label>
             <Input id="class-number" value={displayedClassNo ?? ''} readOnly className="mt-1.5 bg-slate-50" />
+            {!isEdit && nextClassNumber?.missingClassNumbers.length ? (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-700">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Missing class numbers: {nextClassNumber.missingClassNumbers.join(', ')}
+              </p>
+            ) : null}
           </div>
 
           {/* Status */}
