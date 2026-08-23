@@ -72,6 +72,7 @@ export function ClassCard({ classRecord, onEdit }: { classRecord: ClassRecord; o
                 {CLASS_STATUS_LABELS[cls.status]}
               </Badge>
               <Badge variant="outline">{SCHEDULING_TYPE_LABELS[cls.schedulingType]}</Badge>
+              {cls.class_no !== null && <Badge variant="outline">Class {cls.class_no}</Badge>}
             </div>
             {cls.notes && <p className="text-xs text-slate-400 mt-2 line-clamp-1">{cls.notes}</p>}
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-50">
