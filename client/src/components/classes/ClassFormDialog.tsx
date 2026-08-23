@@ -57,6 +57,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const [date, setDate] = useState(todayISO())
   const [time, setTime] = useState('')
   const [studentId, setStudentId] = useState('')
+  const [classNo, setClassNo] = useState<number | null>(null)
   const [classType, setClassType] = useState<ClassType>()
   const [status, setStatus] = useState<ClassStatus>()
   const [schedulingType, setSchedulingType] = useState<SchedulingType>()
@@ -73,6 +74,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
       setDate(toDateInputValue(initialClass.date))
       setTime(initialClass.time || '')
       setStudentId(getStudentId(initialClass))
+      setClassNo(initialClass.class_no)
       setClassType(initialClass.classType)
       setStatus(initialClass.status)
       setSchedulingType(initialClass.schedulingType)
@@ -138,6 +140,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     setDate(todayISO())
     setTime('')
     setStudentId('')
+    setClassNo(null)
     setClassType(undefined)
     setStatus(undefined)
     setSchedulingType(undefined)
@@ -149,6 +152,13 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const canSubmit = !!date && !!classType && !!status && !!schedulingType && (classType === 'demo' || classType === 'substitute' ? true : !!studentId)
 
   const selectedStudent = students?.find(s => s._id === studentId)
+
+  const { data: previousClasses } = useQuery({
+    queryKey: ['classes', 'student-count', studentId],
+    queryFn: () => classesApi.getAll({ studentId, status: 'completed', limit: 1 }),
+    enabled: !!studentId && !isEdit,
+  })
+  const displayedClassNo = isEdit ? classNo : (previousClasses?.total ?? 0) + 1
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false) }}>
@@ -247,6 +257,11 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
             )}
 
             </div>
+
+          <div>
+            <Label htmlFor="class-number">Class No.</Label>
+            <Input id="class-number" value={displayedClassNo ?? ''} readOnly className="mt-1.5 bg-slate-50" />
+          </div>
 
           {/* Status */}
           <div>

@@ -161,7 +161,7 @@ export function StudentDetail() {
               ))}
             </ul>
           )}
-          <Link to={`/classes?student=${student._id}`} className="block text-center text-xs font-medium text-accent mt-3">
+          <Link to={`/classes?studentId=${student._id}`} className="block text-center text-xs font-medium text-accent mt-3">
             View all in Classes
           </Link>
         </CardContent>

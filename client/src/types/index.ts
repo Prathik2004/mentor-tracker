@@ -14,6 +14,7 @@ export interface ClassRecord {
   date: string;
   /** Start time of the class as "HH:MM" (24h). Optional. */
   time: string | null;
+  class_no: number | null;
   studentId: Student | string | null;
   classType: ClassType;
   status: ClassStatus;

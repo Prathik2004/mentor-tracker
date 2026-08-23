@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IClass extends Document {
   date: Date;
   studentId?: mongoose.Types.ObjectId | null;
+  class_no?: number | null;
   /** Start time of the class as "HH:MM" (24h). Optional. */
   time?: string | null;
   classType: 'regular' | 'demo' | 'substitute' | 'ptm';
@@ -37,6 +38,7 @@ const ClassSchema = new Schema({
     // Query, not the doc, so this.classType is always undefined). The routes
     // enforce "student required unless demo/substitute" instead.
   },
+  class_no: { type: Number, min: 1, default: null },
   classType: {
     type: String,
     enum: ['regular', 'demo', 'substitute', 'ptm'],

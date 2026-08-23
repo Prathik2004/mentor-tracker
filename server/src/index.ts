@@ -15,6 +15,8 @@ import settingsRouter from './routes/settings';
 import dashboardRouter from './routes/dashboard';
 import reportsRouter from './routes/reports';
 import incentiveTypesRouter from './routes/incentiveTypes';
+import { recalculateAllStudentIncentives } from './utils/incentiveCalculator';
+import { startIncentiveCron } from './jobs/incentiveCron';
 
 dotenv.config();
 
@@ -65,7 +67,13 @@ if (fs.existsSync(path.join(distPath, 'index.html'))) {
 // endpoint always responds (and reflects DB state) even while Mongo is warming up.
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mentor-tracker')
-  .then(() => console.log('Connected to MongoDB'))
+  .then(async () => {
+    console.log('Connected to MongoDB');
+    await recalculateAllStudentIncentives();
+    console.log('Existing class incentives recalculated');
+    startIncentiveCron();
+    console.log('Incentive reconciliation scheduled every 15 minutes');
+  })
   .catch(err => console.error('MongoDB connection error:', err.message));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

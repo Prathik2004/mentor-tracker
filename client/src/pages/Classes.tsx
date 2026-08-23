@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { classesApi } from '@/api/classes'
 import type { ClassFilters, ClassRecord } from '@/types'
@@ -12,7 +13,13 @@ import { ClassFormDialog } from '@/components/classes/ClassFormDialog'
 import { BookOpen, Plus } from 'lucide-react'
 
 export function Classes() {
-  const [filters, setFilters] = useState<ClassFilters>({ month: getCurrentMonth(), page: 1, limit: 20 })
+  const [searchParams] = useSearchParams()
+  const [filters, setFilters] = useState<ClassFilters>(() => ({
+    month: getCurrentMonth(),
+    studentId: searchParams.get('studentId') || searchParams.get('student') || undefined,
+    page: 1,
+    limit: 20,
+  }))
   const [addOpen, setAddOpen] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassRecord | null>(null)
 

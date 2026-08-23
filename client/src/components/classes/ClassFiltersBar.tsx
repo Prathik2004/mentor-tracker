@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { studentsApi } from '@/api/students'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,6 +22,10 @@ interface ClassFiltersBarProps {
 export function ClassFiltersBar({ filters, onChange }: ClassFiltersBarProps) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '')
   const [showFilters, setShowFilters] = useState(false)
+  const { data: students = [] } = useQuery({
+    queryKey: ['students'],
+    queryFn: () => studentsApi.getAll(),
+  })
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -31,9 +37,12 @@ export function ClassFiltersBar({ filters, onChange }: ClassFiltersBarProps) {
 
   const update = (patch: Partial<ClassFilters>) => onChange({ ...filters, ...patch, page: 1 })
 
-  const hasActiveFilters = !!(filters.classType || filters.status || filters.schedulingType || filters.month || filters.search)
+  const hasActiveFilters = !!(filters.classType || filters.status || filters.schedulingType || filters.month || filters.studentId || filters.search)
 
-  const clearFilters = () => onChange({ page: 1, limit: filters.limit })
+  const clearFilters = () => {
+    setSearchTerm('')
+    onChange({ page: 1, limit: filters.limit })
+  }
 
   return (
     <div className="space-y-3">
@@ -59,6 +68,22 @@ export function ClassFiltersBar({ filters, onChange }: ClassFiltersBarProps) {
 
       {showFilters && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3">
+          <div>
+            <Select
+              value={filters.studentId ?? 'all'}
+              onValueChange={(v) => update({ studentId: v === 'all' ? undefined : v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Student" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All students</SelectItem>
+                {students.map((student) => (
+                  <SelectItem key={student._id} value={student._id}>{student.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Select
               value={filters.classType ?? 'all'}

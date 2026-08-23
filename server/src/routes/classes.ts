@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import Class from '../models/Class';
+import Student from '../models/Student';
 import { buildClassRecord } from '../utils/paymentCalculator';
+import { recalculateStudentIncentives } from '../utils/incentiveCalculator';
 
 const router = Router();
 
@@ -14,6 +16,21 @@ router.get('/', async (req: Request, res: Response) => {
     if (status) filter.status = status;
     if (schedulingType) filter.schedulingType = schedulingType;
     if (studentId) filter.studentId = studentId;
+    if (search && typeof search === 'string' && search.trim()) {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedSearch, 'i');
+      const matchingStudents = await Student.find({
+        $or: [{ name: searchRegex }, { course: searchRegex }]
+      }).select('_id').lean();
+
+      filter.$or = [
+        { studentId: { $in: matchingStudents.map((student) => student._id) } },
+        { classType: searchRegex },
+        { status: searchRegex },
+        { schedulingType: searchRegex },
+        { notes: searchRegex }
+      ];
+    }
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate as string);
@@ -105,6 +122,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     await classRecord.save();
     const populated = await classRecord.populate('studentId', 'name course');
+    if (studentId) await recalculateStudentIncentives(studentId);
     res.status(201).json(populated);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create class' });
@@ -145,6 +163,15 @@ router.put('/:id', async (req: Request, res: Response) => {
     ).populate('studentId', 'name course');
 
     if (!classRecord) return res.status(404).json({ error: 'Class not found' });
+    const affectedStudentIds = new Set<string>();
+    if (existing.studentId) affectedStudentIds.add(String(existing.studentId));
+    if (classRecord.studentId) {
+      const updatedStudentId = typeof classRecord.studentId === 'object' && '_id' in classRecord.studentId
+        ? classRecord.studentId._id
+        : classRecord.studentId;
+      affectedStudentIds.add(String(updatedStudentId));
+    }
+    await Promise.all([...affectedStudentIds].map(recalculateStudentIncentives));
     res.json(classRecord);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update class' });
@@ -159,6 +186,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       { new: true }
     );
     if (!classRecord) return res.status(404).json({ error: 'Class not found' });
+    if (classRecord.studentId) await recalculateStudentIncentives(classRecord.studentId);
     res.json({ message: 'Class deleted', class: classRecord });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete class' });
@@ -173,6 +201,7 @@ router.post('/:id/restore', async (req: Request, res: Response) => {
       { new: true }
     ).populate('studentId', 'name course');
     if (!classRecord) return res.status(404).json({ error: 'Class not found' });
+    if (classRecord.studentId) await recalculateStudentIncentives(classRecord.studentId);
     res.json(classRecord);
   } catch (err) {
     res.status(500).json({ error: 'Failed to restore class' });
