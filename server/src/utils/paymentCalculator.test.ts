@@ -151,6 +151,16 @@ describe('calculateClassPayment', () => {
       ruleId: 'rule-1',
     });
   });
+
+  it('separates regular and PTM amounts for a PTM class', async () => {
+    mockRuleChain(mockRule({ amount: 300 }));
+
+    const result = await calculateClassPayment('ptm', 'completed', new Date(2026, 7, 8));
+
+    expect(result.amount).toBe(600);
+    expect(result.regularAmount).toBe(300);
+    expect(result.ptmAmount).toBe(300);
+  });
 });
 
 describe('buildClassRecord', () => {
@@ -165,6 +175,8 @@ describe('buildClassRecord', () => {
     const record = await buildClassRecord(new Date(2026, 7, 8), 'regular', 'completed');
 
     expect(record.paymentAmount).toBe(300);
+    expect(record.regularPaymentAmount).toBe(300);
+    expect(record.ptmPaymentAmount).toBe(0);
     expect(record.classMonth).toBe('2026-08');
     expect(record.paymentMonth).toBe('2026-09');
     expect(record.paymentWindowStart).toEqual(new Date(2026, 8, 10));
@@ -175,6 +187,16 @@ describe('buildClassRecord', () => {
       amount: 300,
       ruleId: 'rule-1',
     });
+  });
+
+  it('stores PTM income separately while preserving the combined payment amount', async () => {
+    mockRuleChain(mockRule({ amount: 300 }));
+
+    const record = await buildClassRecord(new Date(2026, 7, 8), 'ptm', 'completed');
+
+    expect(record.paymentAmount).toBe(600);
+    expect(record.regularPaymentAmount).toBe(300);
+    expect(record.ptmPaymentAmount).toBe(300);
   });
 
   it('builds the December class with January payment window across years', async () => {

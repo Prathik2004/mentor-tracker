@@ -18,6 +18,15 @@ function containsStudentName(notes: string | undefined, name: string): boolean {
   return new RegExp(escaped, 'i').test(notes);
 }
 
+export function hasCompletedClassSequence(
+  classes: Array<{ class_no?: number | null; status: string }>,
+  milestone: number
+): boolean {
+  const classesByNumber = new Map(classes.map((classRecord) => [classRecord.class_no, classRecord]));
+  return Array.from({ length: milestone }, (_, index) => classesByNumber.get(index + 1))
+    .every((classRecord) => classRecord?.status === 'completed');
+}
+
 function makeIncentive(ruleKey: string, date: Date, type: string, description: string, amount: number) {
   return {
     updateOne: {
@@ -59,10 +68,22 @@ export async function recalculateStudentIncentives(studentId: string | mongoose.
     classRecord.classType === 'demo' && containsStudentName(classRecord.notes, student.name)
   );
 
-  let attended = 0;
+  const assignedClassNumbers = new Set(
+    studentClasses
+      .map((classRecord) => classRecord.class_no)
+      .filter((classNo): classNo is number => typeof classNo === 'number' && classNo > 0)
+  );
+  let nextClassNumber = Math.max(0, ...assignedClassNumbers) + 1;
   const classNumbers = studentClasses.map((classRecord) => {
-    if (classRecord.status === 'completed') attended += 1;
-    const class_no = classRecord.status === 'completed' ? attended : null;
+    let class_no = classRecord.class_no;
+    if (classRecord.status !== 'completed') {
+      class_no = null;
+    } else if (typeof class_no !== 'number' || class_no < 1) {
+      while (assignedClassNumbers.has(nextClassNumber)) nextClassNumber += 1;
+      class_no = nextClassNumber;
+      assignedClassNumbers.add(class_no);
+      nextClassNumber += 1;
+    }
     classRecord.class_no = class_no;
     return { id: classRecord._id, class_no };
   });
@@ -93,9 +114,8 @@ export async function recalculateStudentIncentives(studentId: string | mongoose.
   });
 
   for (const milestone of [4, 8]) {
-    const qualifyingClass = completed[milestone - 1];
-    const firstClasses = studentClasses.slice(0, studentClasses.findIndex((classRecord) => classRecord._id === qualifyingClass?._id) + 1);
-    if (qualifyingClass && firstClasses.every((classRecord) => classRecord.status !== 'cancelled')) {
+    const qualifyingClass = completed.find((classRecord) => classRecord.class_no === milestone);
+    if (qualifyingClass && hasCompletedClassSequence(studentClasses, milestone)) {
       operations.push(makeIncentive(
         `early-class:${id}:${milestone}`,
         qualifyingClass.date,

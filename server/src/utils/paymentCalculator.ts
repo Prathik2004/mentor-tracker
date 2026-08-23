@@ -111,7 +111,7 @@ export async function buildClassRecord(
   classType: string,
   status: string
 ) {
-  const { amount, rule } = await calculateClassPayment(classType, status, date);
+  const { amount, rule, regularAmount, ptmAmount } = await calculateClassPayment(classType, status, date);
   const classMonth = calculateClassMonth(date);
   const paymentMonth = calculatePaymentMonth(classMonth);
   const cycleSettings = await getPaymentCycleSettings();
@@ -119,6 +119,8 @@ export async function buildClassRecord(
 
   return {
     paymentAmount: amount,
+    regularPaymentAmount: classType === 'ptm' ? regularAmount : amount,
+    ptmPaymentAmount: classType === 'ptm' ? ptmAmount : 0,
     paymentRuleSnapshot: rule,
     classMonth,
     paymentMonth,

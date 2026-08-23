@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Class from '../models/Class';
 import Incentive from '../models/Incentive';
 import Payment from '../models/Payment';
+import { calculateClassPayment } from '../utils/paymentCalculator';
 
 const router = Router();
 
@@ -49,6 +50,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
       uniqueStudentsResult,
       classBreakdownResult,
       earningsByTypeResult,
+      legacyPtmClasses,
       noShowEarningsResult,
       statusBreakdownResult,
       schedulingBreakdownResult,
@@ -89,9 +91,39 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
       // Earnings by class type
       Class.aggregate([
         { $match: baseFilter },
-        { $group: { _id: '$classType', total: { $sum: '$paymentAmount' }, count: { $sum: 1 } } },
+        {
+          $group: {
+            _id: '$classType',
+            total: { $sum: '$paymentAmount' },
+            regularTotal: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$classType', 'ptm'] },
+                  { $ifNull: ['$regularPaymentAmount', 0] },
+                  '$paymentAmount'
+                ]
+              }
+            },
+            ptmTotal: {
+              $sum: {
+                $cond: [
+                  { $eq: ['$classType', 'ptm'] },
+                  { $ifNull: ['$ptmPaymentAmount', '$paymentAmount'] },
+                  0
+                ]
+              }
+            },
+            count: { $sum: 1 }
+          }
+        },
         { $sort: { total: -1 } }
       ]),
+
+      Class.find({
+        ...baseFilter,
+        classType: 'ptm',
+        regularPaymentAmount: { $exists: false },
+      }).select('date status').lean(),
 
       // No-show earnings total
       Class.aggregate([
@@ -230,8 +262,31 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     });
 
     const earningsBreakdown: Record<string, { total: number; count: number }> = {};
+    const legacyPtmBreakdown = await legacyPtmClasses.reduce(
+      async (totalsPromise, classRecord: any) => {
+        const totals = await totalsPromise;
+        const payment = await calculateClassPayment('ptm', classRecord.status, classRecord.date);
+        return {
+          regular: totals.regular + payment.regularAmount,
+          ptm: totals.ptm + payment.ptmAmount,
+          combined: totals.combined + payment.amount,
+        };
+      },
+      Promise.resolve({ regular: 0, ptm: 0, combined: 0 })
+    );
     earningsByTypeResult.forEach((item: any) => {
-      earningsBreakdown[item._id] = { total: item.total, count: item.count };
+      if (item._id === 'ptm') {
+        earningsBreakdown.regular = {
+          total: (earningsBreakdown.regular?.total ?? 0) + item.regularTotal + legacyPtmBreakdown.regular,
+          count: earningsBreakdown.regular?.count ?? 0,
+        };
+        earningsBreakdown.ptm = {
+          total: item.ptmTotal - legacyPtmBreakdown.combined + legacyPtmBreakdown.ptm,
+          count: item.count,
+        };
+      } else {
+        earningsBreakdown[item._id] = { total: item.total, count: item.count };
+      }
     });
     earningsBreakdown['no_show'] = { total: noShowEarningsResult[0]?.total ?? 0, count: 0 };
     earningsBreakdown['incentives'] = { total: incentiveEarnings, count: 0 };

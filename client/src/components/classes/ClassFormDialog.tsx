@@ -154,11 +154,15 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const selectedStudent = students?.find(s => s._id === studentId)
 
   const { data: previousClasses } = useQuery({
-    queryKey: ['classes', 'student-count', studentId],
-    queryFn: () => classesApi.getAll({ studentId, status: 'completed', limit: 1 }),
+    queryKey: ['classes', 'student-class-numbers', studentId],
+    queryFn: () => classesApi.getAll({ studentId, status: 'completed', limit: 1000 }),
     enabled: !!studentId && !isEdit,
   })
-  const displayedClassNo = isEdit ? classNo : (previousClasses?.total ?? 0) + 1
+  const lastClassNo = previousClasses?.classes.reduce(
+    (highest, classRecord) => Math.max(highest, classRecord.class_no ?? 0),
+    0
+  ) ?? 0
+  const displayedClassNo = isEdit ? classNo : lastClassNo + 1
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onOpenChange(false) }}>

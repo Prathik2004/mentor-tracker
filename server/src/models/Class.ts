@@ -10,6 +10,8 @@ export interface IClass extends Document {
   status: 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled';
   schedulingType: 'scheduled' | 'on_spot';
   paymentAmount: number;
+  regularPaymentAmount: number;
+  ptmPaymentAmount: number;
   paymentRuleSnapshot: {
     classType: string;
     status: string;
@@ -55,6 +57,8 @@ const ClassSchema = new Schema({
     required: true
   },
   paymentAmount: { type: Number, required: true, min: 0 },
+  regularPaymentAmount: { type: Number, required: true, min: 0, default: 0 },
+  ptmPaymentAmount: { type: Number, required: true, min: 0, default: 0 },
   paymentRuleSnapshot: {
     classType: { type: String },
     status: { type: String },
