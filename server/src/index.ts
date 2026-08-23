@@ -52,12 +52,20 @@ app.get('/api/health', (_req, res) => {
 // share an origin — this works regardless of how NODE_ENV is configured.
 const distPath = path.join(__dirname, '../../client/dist');
 if (fs.existsSync(path.join(distPath, 'index.html'))) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      }
+    },
+  }));
 
   // SPA fallback: any GET that isn't an API route serves index.html
   app.use((req, res, next) => {
     if (req.method === 'GET' && !req.path.startsWith('/api')) {
-      return res.sendFile(path.join(distPath, 'index.html'));
+      return res.sendFile(path.join(distPath, 'index.html'), {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
+      });
     }
     next();
   });

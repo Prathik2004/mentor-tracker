@@ -1,5 +1,5 @@
 /* MentorTrack service worker — offline-friendly caching */
-const CACHE_NAME = 'mentortrack-v1';
+const CACHE_NAME = 'mentortrack-v2';
 const APP_SHELL = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -34,7 +34,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets
+  // Always fetch navigations so deployments are visible without a hard refresh.
+  if (request.mode === 'navigate' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' })
+        .catch(() => caches.match('/') || new Response('Offline', { status: 503 }))
+    );
+    return;
+  }
+
+  // Cache-first for hashed static assets
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
