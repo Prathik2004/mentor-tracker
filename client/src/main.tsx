@@ -6,7 +6,7 @@ import { ToastProvider } from '@/components/ui/toast'
 import App from './App'
 import './index.css'
 
-// Register service worker for offline support (production only)
+// Register service worker for offline support
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {})
