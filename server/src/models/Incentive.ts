@@ -7,7 +7,6 @@ export interface IIncentive extends Document {
   amount: number;
   month: string;
   notes?: string;
-  ruleKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,10 +18,8 @@ const IncentiveSchema = new Schema({
   amount: { type: Number, required: true, min: 0 },
   month: { type: String, required: true },
   notes: { type: String },
-  ruleKey: { type: String, trim: true }
 }, { timestamps: true });
 
 IncentiveSchema.index({ month: 1 });
-IncentiveSchema.index({ ruleKey: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model<IIncentive>('Incentive', IncentiveSchema);
