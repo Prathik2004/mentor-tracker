@@ -106,6 +106,10 @@ export function Earnings() {
 
   const selectedPayment = markMonth ? payments?.find(p => p.earningMonth === markMonth) : null
 
+  const totalEarned = stats?.totalEarned ?? 0
+  const tdsDeduction = Math.round(totalEarned * 0.1)
+  const netEarned = totalEarned - tdsDeduction
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -122,7 +126,7 @@ export function Earnings() {
               {stats?.paymentInfo ? PAYMENT_STATUS_LABELS[stats.paymentInfo.status] : 'Pending'}
             </Badge>
           </div>
-          <p className="text-3xl font-bold text-slate-900">{formatCurrency(stats?.totalEarned ?? 0)}</p>
+          <p className="text-3xl font-bold text-slate-900">{formatCurrency(netEarned)}</p>
 
           <div className="space-y-1.5 border-t border-slate-100 pt-3">
             {breakRows.map(row => (
@@ -136,8 +140,16 @@ export function Earnings() {
               <span className="font-medium text-amber-600">{formatCurrency(stats?.incentiveEarnings ?? 0)}</span>
             </div>
             <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-1.5">
-              <span className="font-semibold text-slate-900">Total</span>
-              <span className="font-bold text-slate-900">{formatCurrency(stats?.totalEarned ?? 0)}</span>
+              <span className="font-semibold text-slate-900">Gross Earnings</span>
+              <span className="font-bold text-slate-900">{formatCurrency(totalEarned)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-600">TDS (10%)</span>
+              <span className="font-medium text-red-600">−{formatCurrency(tdsDeduction)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-1.5">
+              <span className="font-semibold text-slate-900">Net Payable</span>
+              <span className="font-bold text-green-600">{formatCurrency(netEarned)}</span>
             </div>
           </div>
 
