@@ -18,6 +18,7 @@ export interface ClassRecord {
   studentId: Student | string | null;
   classType: ClassType;
   status: ClassStatus;
+  countNoShow: boolean;
   schedulingType: SchedulingType;
   paymentAmount: number;
   regularPaymentAmount: number;
@@ -132,6 +133,7 @@ export interface CreateClassInput {
   studentId: string | null;
   classType: ClassType;
   status: ClassStatus;
+  countNoShow?: boolean;
   schedulingType: SchedulingType;
   notes?: string;
   confirmDuplicate?: boolean;
@@ -151,6 +153,24 @@ export interface CreateIncentiveInput {
   description?: string;
   amount: number;
   month: string;
+  notes?: string;
+}
+
+export interface Deduction {
+  _id: string;
+  date: string;
+  type: string;
+  amount: number;
+  month: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDeductionInput {
+  date: string;
+  type: string;
+  amount: number;
   notes?: string;
 }
 

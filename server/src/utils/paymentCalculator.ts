@@ -1,9 +1,9 @@
 import PaymentRule from '../models/PaymentRule';
 import Settings from '../models/Settings';
 
-export async function getPaymentCycleSettings() {
-  const windowStart = await Settings.findOne({ key: 'payment_window_start' });
-  const windowEnd = await Settings.findOne({ key: 'payment_window_end' });
+export async function getPaymentCycleSettings(ownerId: string) {
+  const windowStart = await Settings.findOne({ ownerId, key: 'payment_window_start' });
+  const windowEnd = await Settings.findOne({ ownerId, key: 'payment_window_end' });
   return {
     windowStart: windowStart?.value ?? 10,
     windowEnd: windowEnd?.value ?? 15
@@ -35,11 +35,13 @@ export function calculatePaymentWindow(paymentMonth: string, windowStart: number
 export async function getApplicablePaymentRule(
   classType: string,
   status: string,
-  classDate: Date
+  classDate: Date,
+  ownerId: string
 ) {
   const paymentStatus = status === 'completed' ? 'completed' : 'student_no_show';
 
   const filter: any = {
+    ownerId,
     classType,
     status: paymentStatus,
     effectiveFrom: { $lte: classDate },
@@ -57,7 +59,8 @@ export async function getApplicablePaymentRule(
 export async function calculateClassPayment(
   classType: string,
   status: string,
-  classDate: Date
+  classDate: Date,
+  ownerId: string
 ) {
   if (status === 'cancelled' || status === 'rescheduled') {
     return { amount: 0, rule: null, regularAmount: 0, ptmAmount: 0 };
@@ -66,8 +69,8 @@ export async function calculateClassPayment(
   // PTM means "Regular class + PTM" — combine both payment rules.
   if (classType === 'ptm') {
     const [regularRule, ptmRule] = await Promise.all([
-      getApplicablePaymentRule('regular', status, classDate),
-      getApplicablePaymentRule('ptm', status, classDate),
+      getApplicablePaymentRule('regular', status, classDate, ownerId),
+      getApplicablePaymentRule('ptm', status, classDate, ownerId),
     ]);
 
     const regularAmount = regularRule?.amount ?? 0;
@@ -87,7 +90,7 @@ export async function calculateClassPayment(
     };
   }
 
-  const rule = await getApplicablePaymentRule(classType, status, classDate);
+  const rule = await getApplicablePaymentRule(classType, status, classDate, ownerId);
 
   if (!rule) {
     return { amount: 0, rule: null, regularAmount: 0, ptmAmount: 0 };
@@ -109,12 +112,13 @@ export async function calculateClassPayment(
 export async function buildClassRecord(
   date: Date,
   classType: string,
-  status: string
+  status: string,
+  ownerId: string
 ) {
-  const { amount, rule, regularAmount, ptmAmount } = await calculateClassPayment(classType, status, date);
+  const { amount, rule, regularAmount, ptmAmount } = await calculateClassPayment(classType, status, date, ownerId);
   const classMonth = calculateClassMonth(date);
   const paymentMonth = calculatePaymentMonth(classMonth);
-  const cycleSettings = await getPaymentCycleSettings();
+  const cycleSettings = await getPaymentCycleSettings(ownerId);
   const window = calculatePaymentWindow(paymentMonth, cycleSettings.windowStart, cycleSettings.windowEnd);
 
   return {

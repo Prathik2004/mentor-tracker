@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import Incentive from '../models/Incentive';
 import { calculateClassMonth } from '../utils/paymentCalculator';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { month } = req.query;
-    const filter: any = {};
+    const filter: any = { ownerId: getUserId(req) };
     if (month) {
       filter.month = month;
     }
@@ -20,7 +21,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const incentive = await Incentive.findById(req.params.id);
+    const incentive = await Incentive.findOne({ _id: req.params.id, ownerId: getUserId(req) });
     if (!incentive) return res.status(404).json({ error: 'Incentive not found' });
     res.json(incentive);
   } catch (err) {
@@ -46,6 +47,7 @@ router.post('/', async (req: Request, res: Response) => {
       amount,
       month,
       notes,
+      ownerId: getUserId(req),
     });
 
     await incentive.save();
@@ -66,7 +68,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     }
 
     const incentive = await Incentive.findByIdAndUpdate(
-      req.params.id,
+      { _id: req.params.id, ownerId: getUserId(req) },
       { $set: updates },
       { new: true, runValidators: true }
     );
@@ -79,7 +81,7 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const incentive = await Incentive.findByIdAndDelete(req.params.id);
+    const incentive = await Incentive.findOneAndDelete({ _id: req.params.id, ownerId: getUserId(req) });
     if (!incentive) return res.status(404).json({ error: 'Incentive not found' });
     res.json({ message: 'Incentive deleted' });
   } catch (err) {

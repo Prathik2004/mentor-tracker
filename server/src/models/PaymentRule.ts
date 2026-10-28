@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPaymentRule extends Document {
+  ownerId: mongoose.Types.ObjectId;
   classType: 'regular' | 'demo' | 'substitute' | 'ptm';
   status: 'completed' | 'student_no_show';
   amount: number;
@@ -11,6 +12,7 @@ export interface IPaymentRule extends Document {
 }
 
 const PaymentRuleSchema = new Schema({
+  ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   classType: {
     type: String,
     enum: ['regular', 'demo', 'substitute', 'ptm'],
@@ -26,6 +28,6 @@ const PaymentRuleSchema = new Schema({
   effectiveTo: { type: Date, default: null }
 }, { timestamps: true });
 
-PaymentRuleSchema.index({ classType: 1, status: 1, effectiveFrom: 1 });
+PaymentRuleSchema.index({ ownerId: 1, classType: 1, status: 1, effectiveFrom: 1 });
 
 export default mongoose.model<IPaymentRule>('PaymentRule', PaymentRuleSchema);

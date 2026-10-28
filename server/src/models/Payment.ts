@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IPayment extends Document {
+  ownerId: mongoose.Types.ObjectId;
   earningMonth: string;
   expectedAmount: number;
   receivedAmount: number | null;
@@ -14,7 +15,8 @@ export interface IPayment extends Document {
 }
 
 const PaymentSchema = new Schema({
-  earningMonth: { type: String, required: true, unique: true },
+  ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  earningMonth: { type: String, required: true },
   expectedAmount: { type: Number, required: true, default: 0 },
   receivedAmount: { type: Number, default: null },
   expectedWindowStart: { type: Date, required: true },
@@ -28,6 +30,6 @@ const PaymentSchema = new Schema({
   notes: { type: String }
 }, { timestamps: true });
 
-PaymentSchema.index({ earningMonth: 1 });
+PaymentSchema.index({ ownerId: 1, earningMonth: 1 }, { unique: true });
 
 export default mongoose.model<IPayment>('Payment', PaymentSchema);

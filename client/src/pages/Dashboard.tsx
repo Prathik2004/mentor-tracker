@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useToast } from '@/components/ui/toast'
+import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { dashboardApi } from '@/api/dashboard'
 import { getCurrentMonth, getGreeting } from '@/utils/format'
 import { MonthPicker } from '@/components/ui/month-picker'
@@ -16,22 +18,33 @@ import { InsightsCard } from '@/components/dashboard/InsightsCard'
 import { MonthlyChart } from '@/components/dashboard/MonthlyChart'
 
 export function Dashboard() {
+  const { handleError } = useErrorHandler()
   const [month, setMonth] = useState(getCurrentMonth())
 
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, error: statsError } = useQuery({
     queryKey: ['dashboard-stats', month],
     queryFn: () => dashboardApi.getStats(month),
+    retry: 2,
   })
 
-  const { data: history } = useQuery({
+  const { data: history, error: historyError } = useQuery({
     queryKey: ['monthly-history'],
     queryFn: () => dashboardApi.getMonthlyHistory(),
+    retry: 2,
   })
 
-  const { data: insights } = useQuery({
+  const { data: insights, error: insightsError } = useQuery({
     queryKey: ['insights', month],
     queryFn: () => dashboardApi.getInsights(month),
+    retry: 2,
   })
+
+  // Show error toasts
+  useEffect(() => {
+    if (statsError) handleError(statsError, 'Failed to load dashboard stats')
+    if (historyError) handleError(historyError, 'Failed to load payment history')
+    if (insightsError) handleError(insightsError, 'Failed to load insights')
+  }, [statsError, historyError, insightsError, handleError])
 
   if (isLoading) return <DashboardSkeleton />
   if (!stats) return null

@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import Student from '../models/Student';
 import Class from '../models/Class';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { search, status } = req.query;
-    const filter: any = {};
+    const filter: any = { ownerId: getUserId(req) };
     if (search) {
       filter.name = { $regex: search as string, $options: 'i' };
     }
@@ -23,7 +24,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const student = await Student.findById(req.params.id);
+    const student = await Student.findOne({ _id: req.params.id, ownerId: getUserId(req) });
     if (!student) return res.status(404).json({ error: 'Student not found' });
     res.json(student);
   } catch (err) {
@@ -37,7 +38,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Student name is required' });
     }
-    const student = new Student({ name: name.trim(), age, course, status, notes });
+    const student = new Student({ ownerId: getUserId(req), name: name.trim(), age, course, status, notes });
     await student.save();
     res.status(201).json(student);
   } catch (err) {
@@ -48,7 +49,7 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const student = await Student.findByIdAndUpdate(
-      req.params.id,
+      { _id: req.params.id, ownerId: getUserId(req) },
       { $set: req.body },
       { new: true, runValidators: true }
     );
@@ -61,11 +62,12 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const classCount = await Class.countDocuments({ studentId: req.params.id, deletedAt: null });
+    const ownerId = getUserId(req);
+    const classCount = await Class.countDocuments({ ownerId, studentId: req.params.id, deletedAt: null });
     if (classCount > 0) {
       return res.status(400).json({ error: `Cannot delete student with ${classCount} associated classes` });
     }
-    const student = await Student.findByIdAndDelete(req.params.id);
+    const student = await Student.findOneAndDelete({ _id: req.params.id, ownerId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
     res.json({ message: 'Student deleted' });
   } catch (err) {

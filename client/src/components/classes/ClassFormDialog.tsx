@@ -60,6 +60,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const [classNo, setClassNo] = useState<number | null>(null)
   const [classType, setClassType] = useState<ClassType>()
   const [status, setStatus] = useState<ClassStatus>()
+  const [countNoShow, setCountNoShow] = useState(false)
   const [schedulingType, setSchedulingType] = useState<SchedulingType>()
   const [notes, setNotes] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,6 +78,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
       setClassNo(initialClass.class_no)
       setClassType(initialClass.classType)
       setStatus(initialClass.status)
+      setCountNoShow(initialClass.countNoShow ?? false)
       setSchedulingType(initialClass.schedulingType)
       setNotes(initialClass.notes || '')
       setSearchTerm('')
@@ -109,6 +111,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
         studentId: studentId || null,
         classType: classType!,
         status: status!,
+        countNoShow,
         schedulingType: schedulingType!,
         notes: notes || undefined,
         confirmDuplicate: duplicateConfirm,
@@ -143,6 +146,7 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     setClassNo(null)
     setClassType(undefined)
     setStatus(undefined)
+    setCountNoShow(false)
     setSchedulingType(undefined)
     setNotes('')
     setSearchTerm('')
@@ -298,6 +302,21 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
               </SelectContent>
             </Select>
           </div>
+
+          {status === 'student_no_show' && classType !== 'demo' && classType !== 'substitute' && (
+            <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <input
+                type="checkbox"
+                checked={countNoShow}
+                onChange={(e) => setCountNoShow(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-amber-300 text-slate-900 focus:ring-slate-950"
+              />
+              <span>
+                <span className="block font-medium">Count this no-show as a class</span>
+                <span className="block text-xs text-amber-700">If checked, this class uses the next class number. If unchecked, the next class number stays available.</span>
+              </span>
+            </label>
+          )}
 
           {/* Notes */}
           <div>

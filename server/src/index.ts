@@ -15,6 +15,9 @@ import settingsRouter from './routes/settings';
 import dashboardRouter from './routes/dashboard';
 import reportsRouter from './routes/reports';
 import incentiveTypesRouter from './routes/incentiveTypes';
+import deductionsRouter from './routes/deductions';
+import authRouter from './routes/auth';
+import { requireAuth } from './middleware/auth';
 dotenv.config();
 
 const app = express();
@@ -24,15 +27,18 @@ app.use(cors());
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json());
 
-app.use('/api/students', studentsRouter);
-app.use('/api/classes', classesRouter);
-app.use('/api/incentives', incentivesRouter);
-app.use('/api/payments', paymentsRouter);
-app.use('/api/payment-rules', paymentRulesRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/dashboard', dashboardRouter);
-app.use('/api/reports', reportsRouter);
-app.use('/api/incentive-types', incentiveTypesRouter);
+app.use('/api/auth', authRouter);
+
+app.use('/api/students', requireAuth, studentsRouter);
+app.use('/api/classes', requireAuth, classesRouter);
+app.use('/api/incentives', requireAuth, incentivesRouter);
+app.use('/api/payments', requireAuth, paymentsRouter);
+app.use('/api/payment-rules', requireAuth, paymentRulesRouter);
+app.use('/api/settings', requireAuth, settingsRouter);
+app.use('/api/dashboard', requireAuth, dashboardRouter);
+app.use('/api/reports', requireAuth, reportsRouter);
+app.use('/api/incentive-types', requireAuth, incentiveTypesRouter);
+app.use('/api/deductions', requireAuth, deductionsRouter);
 
 // Health check — used by Render's health checks and external uptime pingers
 app.get('/api/health', (_req, res) => {

@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/components/ui/toast'
+import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { dashboardApi } from '@/api/dashboard'
 import { paymentsApi } from '@/api/payments'
 import { incentivesApi } from '@/api/incentives'
+import { deductionsApi } from '@/api/deductions'
 import type { PaymentStatus } from '@/types'
 import { PAYMENT_STATUS_LABELS } from '@/types'
 import { getCurrentMonth, formatMonth, formatCurrency, formatDate, formatMonthShort } from '@/utils/format'
@@ -22,8 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useToast } from '@/components/ui/toast'
-import { ChevronRight, Receipt, ShoppingBag } from 'lucide-react'
+import { ChevronRight, Receipt, ShoppingBag, Trash2, Plus } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 export function Earnings() {
@@ -33,28 +35,77 @@ export function Earnings() {
   const [receivedDate, setReceivedDate] = useState(() => new Date().toISOString().split('T')[0])
   const [payStatus, setPayStatus] = useState<PaymentStatus>('received')
   const [payNotes, setPayNotes] = useState('')
+  const [deductionType, setDeductionType] = useState('')
+  const [deductionAmount, setDeductionAmount] = useState('')
+  const [deductionNotes, setDeductionNotes] = useState('')
 
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { handleError } = useErrorHandler()
 
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, error: statsError } = useQuery({
     queryKey: ['dashboard-stats', month],
     queryFn: () => dashboardApi.getStats(month),
+    retry: 2,
   })
 
-  const { data: history } = useQuery({
+  const { data: history, error: historyError } = useQuery({
     queryKey: ['monthly-history'],
     queryFn: () => dashboardApi.getMonthlyHistory(),
+    retry: 2,
   })
 
-  const { data: payments } = useQuery({
+  const { data: payments, error: paymentsError } = useQuery({
     queryKey: ['payments'],
     queryFn: () => paymentsApi.getAll(),
+    retry: 2,
   })
 
-  const { data: incentives } = useQuery({
+  const { data: incentives, error: incentivesError } = useQuery({
     queryKey: ['incentives', month],
     queryFn: () => incentivesApi.getAll(month),
+    retry: 2,
+  })
+
+  const { data: deductions, error: deductionsError } = useQuery({
+    queryKey: ['deductions', month],
+    queryFn: () => deductionsApi.getAll(month),
+    retry: 2,
+  })
+
+  // Show error toasts
+  useEffect(() => {
+    if (statsError) handleError(statsError, 'Failed to load earnings overview')
+    if (historyError) handleError(historyError, 'Failed to load payment history')
+    if (paymentsError) handleError(paymentsError, 'Failed to load payments')
+    if (incentivesError) handleError(incentivesError, 'Failed to load incentives')
+    if (deductionsError) handleError(deductionsError, 'Failed to load deductions')
+  }, [statsError, historyError, paymentsError, incentivesError, deductionsError, handleError])
+
+  const addDeduction = useMutation({
+    mutationFn: () => deductionsApi.create({
+      date: `${month}-01`,
+      type: deductionType.trim(),
+      amount: Number(deductionAmount),
+      notes: deductionNotes.trim() || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deductions', month] })
+      setDeductionType('')
+      setDeductionAmount('')
+      setDeductionNotes('')
+      toast('Deduction added', 'success')
+    },
+    onError: (error) => handleError(error, 'Failed to add deduction'),
+  })
+
+  const deleteDeduction = useMutation({
+    mutationFn: (id: string) => deductionsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deductions', month] })
+      toast('Deduction deleted', 'success')
+    },
+    onError: (error) => handleError(error, 'Failed to delete deduction'),
   })
 
   const updatePayment = useMutation({
@@ -68,10 +119,10 @@ export function Earnings() {
     onSuccess: (p) => {
       queryClient.invalidateQueries({ queryKey: ['payments'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      toast(`Payment marked as ${PAYMENT_STATUS_LABELS[p.status]}`, 'success')
+      toast(`✓ Payment marked as ${PAYMENT_STATUS_LABELS[p.status]}`, 'success')
       setMarkMonth(null)
     },
-    onError: () => toast('Could not update payment', 'error'),
+    onError: (error) => handleError(error, 'Failed to update payment status'),
   })
 
   function openPaymentDialog(mon: string) {
@@ -107,8 +158,10 @@ export function Earnings() {
   const selectedPayment = markMonth ? payments?.find(p => p.earningMonth === markMonth) : null
 
   const totalEarned = stats?.totalEarned ?? 0
-  const tdsDeduction = Math.round(totalEarned * 0.1)
-  const netEarned = totalEarned - tdsDeduction
+  const totalDeductions = deductions?.reduce((sum, deduction) => sum + deduction.amount, 0) ?? 0
+  const taxableEarnings = Math.max(0, totalEarned - totalDeductions)
+  const tdsDeduction = Math.round(taxableEarnings * 0.1)
+  const netEarned = taxableEarnings - tdsDeduction
 
   return (
     <div className="space-y-4">
@@ -146,6 +199,10 @@ export function Earnings() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-600">TDS (10%)</span>
               <span className="font-medium text-red-600">−{formatCurrency(tdsDeduction)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-slate-600">Deductions</span>
+              <span className="font-medium text-red-600">−{formatCurrency(totalDeductions)}</span>
             </div>
             <div className="flex items-center justify-between text-sm border-t border-slate-100 pt-1.5">
               <span className="font-semibold text-slate-900">Net Payable</span>
@@ -205,6 +262,52 @@ export function Earnings() {
               ))}
             </ul>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Deductions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-slate-500 flex items-center gap-2">
+            <Trash2 className="h-4 w-4" />
+            Deductions · {formatMonth(month)}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_8rem_auto]">
+            <Input placeholder="Training fee or penalty" value={deductionType} onChange={(e) => setDeductionType(e.target.value)} />
+            <Input type="number" min="0" placeholder="Amount" value={deductionAmount} onChange={(e) => setDeductionAmount(e.target.value)} />
+            <Button
+              onClick={() => addDeduction.mutate()}
+              disabled={addDeduction.isPending || !deductionType.trim() || deductionAmount === '' || Number(deductionAmount) < 0}
+              size="icon"
+              aria-label="Add deduction"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <Input placeholder="Optional note" value={deductionNotes} onChange={(e) => setDeductionNotes(e.target.value)} />
+          {!deductions || deductions.length === 0 ? (
+            <p className="text-sm text-slate-400 py-2 text-center">No deductions this month</p>
+          ) : (
+            <ul className="space-y-2">
+              {deductions.map(deduction => (
+                <li key={deduction._id} className="flex items-center justify-between text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-800 truncate">{deduction.type}</p>
+                    {deduction.notes && <p className="text-xs text-slate-400 truncate">{deduction.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-semibold text-red-600">−{formatCurrency(deduction.amount)}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteDeduction.mutate(deduction._id)} aria-label={`Delete ${deduction.type}`}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-slate-500">TDS is calculated on gross earnings minus these deductions.</p>
         </CardContent>
       </Card>
 

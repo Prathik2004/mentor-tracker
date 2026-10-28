@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IStudent extends Document {
+  ownerId: mongoose.Types.ObjectId;
   name: string;
   age?: number;
   course?: string;
@@ -11,6 +12,7 @@ export interface IStudent extends Document {
 }
 
 const StudentSchema = new Schema({
+  ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   name: { type: String, required: true, trim: true },
   age: { type: Number },
   course: { type: String, trim: true },
@@ -18,6 +20,6 @@ const StudentSchema = new Schema({
   notes: { type: String }
 }, { timestamps: true });
 
-StudentSchema.index({ name: 'text' });
+StudentSchema.index({ ownerId: 1, name: 'text' });
 
 export default mongoose.model<IStudent>('Student', StudentSchema);

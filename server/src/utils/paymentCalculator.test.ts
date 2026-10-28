@@ -103,14 +103,14 @@ describe('getApplicablePaymentRule', () => {
   it('finds the active rule for a class date', async () => {
     const rule = mockRule();
     mockRuleChain(rule);
-    const result = await getApplicablePaymentRule('regular', 'completed', new Date(2026, 7, 8));
+    const result = await getApplicablePaymentRule('regular', 'completed', new Date(2026, 7, 8), 'test-user-id');
     expect(result).toBe(rule);
   });
 
   it('maps a no-show class to the no-show rule', async () => {
     const rule = mockRule({ status: 'student_no_show', amount: 50 });
     mockRuleChain(rule);
-    await getApplicablePaymentRule('regular', 'student_no_show', new Date(2026, 7, 8));
+    await getApplicablePaymentRule('regular', 'student_no_show', new Date(2026, 7, 8), 'test-user-id');
     expect(mockedFindOne).toHaveBeenCalledWith(
       expect.objectContaining({ classType: 'regular', status: 'student_no_show' })
     );
@@ -124,25 +124,25 @@ describe('calculateClassPayment', () => {
   });
 
   it('returns 0 for cancelled classes', async () => {
-    const { amount, rule } = await calculateClassPayment('regular', 'cancelled', new Date(2026, 7, 8));
+    const { amount, rule } = await calculateClassPayment('regular', 'cancelled', new Date(2026, 7, 8), 'test-user-id');
     expect(amount).toBe(0);
     expect(rule).toBeNull();
   });
 
   it('returns 0 for rescheduled classes', async () => {
-    const { amount } = await calculateClassPayment('demo', 'rescheduled', new Date(2026, 7, 8));
+    const { amount } = await calculateClassPayment('demo', 'rescheduled', new Date(2026, 7, 8), 'test-user-id');
     expect(amount).toBe(0);
   });
 
   it('returns 0 when no rule exists', async () => {
     mockRuleChain(null);
-    const { amount } = await calculateClassPayment('regular', 'completed', new Date(2026, 7, 8));
+    const { amount } = await calculateClassPayment('regular', 'completed', new Date(2026, 7, 8), 'test-user-id');
     expect(amount).toBe(0);
   });
 
   it('returns the rule amount and a snapshot for a completed regular class', async () => {
     mockRuleChain(mockRule({ amount: 300 }));
-    const { amount, rule } = await calculateClassPayment('regular', 'completed', new Date(2026, 7, 8));
+    const { amount, rule } = await calculateClassPayment('regular', 'completed', new Date(2026, 7, 8), 'test-user-id');
     expect(amount).toBe(300);
     expect(rule).toEqual({
       classType: 'regular',
@@ -155,7 +155,7 @@ describe('calculateClassPayment', () => {
   it('separates regular and PTM amounts for a PTM class', async () => {
     mockRuleChain(mockRule({ amount: 300 }));
 
-    const result = await calculateClassPayment('ptm', 'completed', new Date(2026, 7, 8));
+    const result = await calculateClassPayment('ptm', 'completed', new Date(2026, 7, 8), 'test-user-id');
 
     expect(result.amount).toBe(600);
     expect(result.regularAmount).toBe(300);
@@ -172,7 +172,7 @@ describe('buildClassRecord', () => {
   it('builds a complete class record with month and payment window', async () => {
     mockRuleChain(mockRule({ amount: 300 }));
 
-    const record = await buildClassRecord(new Date(2026, 7, 8), 'regular', 'completed');
+    const record = await buildClassRecord(new Date(2026, 7, 8), 'regular', 'completed', 'test-user-id');
 
     expect(record.paymentAmount).toBe(300);
     expect(record.regularPaymentAmount).toBe(300);
@@ -192,7 +192,7 @@ describe('buildClassRecord', () => {
   it('stores PTM income separately while preserving the combined payment amount', async () => {
     mockRuleChain(mockRule({ amount: 300 }));
 
-    const record = await buildClassRecord(new Date(2026, 7, 8), 'ptm', 'completed');
+    const record = await buildClassRecord(new Date(2026, 7, 8), 'ptm', 'completed', 'test-user-id');
 
     expect(record.paymentAmount).toBe(600);
     expect(record.regularPaymentAmount).toBe(300);
@@ -202,7 +202,7 @@ describe('buildClassRecord', () => {
   it('builds the December class with January payment window across years', async () => {
     mockRuleChain(mockRule({ amount: 300 }));
 
-    const record = await buildClassRecord(new Date(2026, 11, 20), 'regular', 'completed');
+    const record = await buildClassRecord(new Date(2026, 11, 20), 'regular', 'completed', 'test-user-id');
 
     expect(record.classMonth).toBe('2026-12');
     expect(record.paymentMonth).toBe('2027-01');
@@ -214,7 +214,7 @@ describe('buildClassRecord', () => {
     mockRuleChain(mockRule({ amount: 300 }));
     mockSettings(1, 5);
 
-    const record = await buildClassRecord(new Date(2026, 7, 8), 'regular', 'completed');
+    const record = await buildClassRecord(new Date(2026, 7, 8), 'regular', 'completed', 'test-user-id');
     expect(record.paymentWindowStart).toEqual(new Date(2026, 8, 1));
     expect(record.paymentWindowEnd).toEqual(new Date(2026, 8, 5));
   });
@@ -222,12 +222,12 @@ describe('buildClassRecord', () => {
   it('preserves the historical rule amount when a class is created', async () => {
     // Class created in August uses the August rule
     mockRuleChain(mockRule({ amount: 300 }));
-    const augustRecord = await buildClassRecord(new Date(2026, 7, 15), 'regular', 'completed');
+    const augustRecord = await buildClassRecord(new Date(2026, 7, 15), 'regular', 'completed', 'test-user-id');
     expect(augustRecord.paymentAmount).toBe(300);
 
     // Later, the rule changes to 350 for a September class
     mockRuleChain(mockRule({ amount: 350 }));
-    const septemberRecord = await buildClassRecord(new Date(2026, 8, 1), 'regular', 'completed');
+    const septemberRecord = await buildClassRecord(new Date(2026, 8, 1), 'regular', 'completed', 'test-user-id');
     expect(septemberRecord.paymentAmount).toBe(350);
 
     // The August snapshot is preserved

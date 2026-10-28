@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   BookOpen,
@@ -8,8 +8,10 @@ import {
   FileText,
   Plus,
   GraduationCap,
+  LogOut,
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
+import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +29,14 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onAddClass, onAddStudent, onAddIncentive }: SidebarProps) {
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
+
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white border-r border-slate-200 z-50">
       <div className="flex items-center gap-3 px-6 h-16 border-b border-slate-200">
@@ -82,6 +92,18 @@ export function Sidebar({ onAddClass, onAddStudent, onAddIncentive }: SidebarPro
           <TrendingUp className="h-4 w-4" />
           Add Incentive
         </button>
+        <div className="pt-2 border-t border-slate-200">
+          <div className="px-3 py-2 text-xs text-slate-500 font-medium">
+            {user?.name}
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
       </div>
     </aside>
   )

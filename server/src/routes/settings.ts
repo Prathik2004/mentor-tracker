@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import Settings from '../models/Settings';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const settings = await Settings.find();
+    const settings = await Settings.find({ ownerId: getUserId(req) });
     const settingsObj: Record<string, any> = {};
     settings.forEach(s => {
       settingsObj[s.key] = s.value;
@@ -27,8 +28,8 @@ router.put('/', async (req: Request, res: Response) => {
     const results: Record<string, any> = {};
     for (const [key, value] of Object.entries(updates)) {
       const setting = await Settings.findOneAndUpdate(
-        { key },
-        { $set: { key, value } },
+        { ownerId: getUserId(req), key },
+        { $set: { ownerId: getUserId(req), key, value } },
         { upsert: true, new: true }
       );
       results[key] = setting.value;

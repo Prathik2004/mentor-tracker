@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
+import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { CreditCard, Download, Save, Trash2, Info, Plus } from 'lucide-react'
 
 const STATUS_LABELS = { completed: 'Completed', student_no_show: 'Student No-show' }
@@ -27,6 +28,7 @@ const STATUS_LABELS = { completed: 'Completed', student_no_show: 'Student No-sho
 export function Settings() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { handleError } = useErrorHandler()
 
   const [editRule, setEditRule] = useState<PaymentRule | null>(null)
   const [editAmount, setEditAmount] = useState('')
@@ -73,7 +75,7 @@ export function Settings() {
       toast('Payment rule updated. Future classes will use the new rate.', 'success')
       setEditRule(null)
     },
-    onError: () => toast('Could not update payment rule', 'error'),
+    onError: (error) => handleError(error, 'Could not update payment rule'),
   })
 
   // If an active rule already exists for the chosen combo, "add" becomes "replace"
@@ -100,7 +102,7 @@ export function Settings() {
       setNewRuleStatus('')
       setNewRuleAmount('')
     },
-    onError: () => toast('Could not add payment rule', 'error'),
+    onError: (error) => handleError(error, 'Could not add payment rule'),
   })
 
   const canAddRule =
@@ -117,7 +119,7 @@ export function Settings() {
       setWindowDirty(false)
       toast('Payment cycle updated', 'success')
     },
-    onError: () => toast('Could not save payment cycle', 'error'),
+    onError: (error) => handleError(error, 'Could not save payment cycle'),
   })
 
   const addType = useMutation({
@@ -127,7 +129,7 @@ export function Settings() {
       setNewTypeName('')
       toast('Incentive type added', 'success')
     },
-    onError: () => toast('Could not add incentive type', 'error'),
+    onError: (error) => handleError(error, 'Could not add incentive type'),
   })
 
   const deleteType = useMutation({

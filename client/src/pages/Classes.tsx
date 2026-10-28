@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useToast } from '@/components/ui/toast'
 import { classesApi } from '@/api/classes'
 import type { ClassFilters, ClassRecord } from '@/types'
 import { getCurrentMonth } from '@/utils/format'
@@ -14,6 +15,7 @@ import { BookOpen, Plus } from 'lucide-react'
 
 export function Classes() {
   const [searchParams] = useSearchParams()
+  const { toast } = useToast()
   const [filters, setFilters] = useState<ClassFilters>(() => ({
     month: getCurrentMonth(),
     studentId: searchParams.get('studentId') || searchParams.get('student') || undefined,
@@ -23,10 +25,19 @@ export function Classes() {
   const [addOpen, setAddOpen] = useState(false)
   const [editingClass, setEditingClass] = useState<ClassRecord | null>(null)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['classes', filters],
     queryFn: () => classesApi.getAll(filters),
+    retry: 2,
   })
+
+  // Show error toast only once
+  useEffect(() => {
+    if (error) {
+      const message = (error as any)?.error || 'Failed to load classes. Please try again.'
+      toast(message, 'error')
+    }
+  }, [error, toast])
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '@/components/ui/toast'
 import { studentsApi } from '@/api/students'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,13 +13,23 @@ import { Users, Search, Plus, GraduationCap } from 'lucide-react'
 
 export function Students() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
 
-  const { data: students, isLoading } = useQuery({
+  const { data: students, isLoading, error } = useQuery({
     queryKey: ['students', search],
     queryFn: () => studentsApi.getAll(search || undefined),
+    retry: 2,
   })
+
+  // Show error toast only once
+  useEffect(() => {
+    if (error) {
+      const message = (error as any)?.error || 'Failed to load students. Please try again.'
+      toast(message, 'error')
+    }
+  }, [error, toast])
 
   return (
     <div className="space-y-4">

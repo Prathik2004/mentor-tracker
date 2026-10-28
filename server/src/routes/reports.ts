@@ -4,6 +4,7 @@ import Class from '../models/Class';
 import Incentive from '../models/Incentive';
 import Payment from '../models/Payment';
 import Student from '../models/Student';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
@@ -11,7 +12,8 @@ const router = Router();
 router.get('/monthly/:month', async (req: Request, res: Response) => {
   try {
     const { month } = req.params;
-    const baseFilter = { classMonth: month, deletedAt: null };
+    const ownerId = getUserId(req);
+    const baseFilter = { classMonth: month, deletedAt: null, ownerId };
 
     const [classes, incentives, payment, summary, studentBreakdown, dailyBreakdown] = await Promise.all([
       Class.find(baseFilter)
@@ -19,9 +21,9 @@ router.get('/monthly/:month', async (req: Request, res: Response) => {
         .sort({ date: 1 })
         .lean(),
 
-      Incentive.find({ month }).sort({ date: 1 }).lean(),
+      Incentive.find({ month, ownerId }).sort({ date: 1 }).lean(),
 
-      Payment.findOne({ earningMonth: month }).lean(),
+      Payment.findOne({ earningMonth: month, ownerId }).lean(),
 
       Class.aggregate([
         { $match: baseFilter },

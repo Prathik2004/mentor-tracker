@@ -3,7 +3,13 @@ import mongoose from 'mongoose';
 import Class from '../models/Class';
 import Incentive from '../models/Incentive';
 import Payment from '../models/Payment';
-import { calculateClassPayment } from '../utils/paymentCalculator';
+import {
+  calculateClassPayment,
+  calculatePaymentMonth,
+  calculatePaymentWindow,
+  getPaymentCycleSettings,
+} from '../utils/paymentCalculator';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
@@ -12,6 +18,8 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
   try {
     const { month } = req.params; // "2026-08" format
     const monthStr = String(month);
+    const ownerId = getUserId(req);
+    const ownerObjectId = new mongoose.Types.ObjectId(ownerId);
 
     // Parse month for date calculations
     const [year, monthNum] = monthStr.split('-').map(Number);
@@ -40,7 +48,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
     lastWeekEnd.setHours(23, 59, 59, 999);
 
-    const baseFilter = { classMonth: monthStr, deletedAt: null };
+    const baseFilter = { classMonth: monthStr, deletedAt: null, ownerId: ownerObjectId };
 
     // Run multiple aggregations in parallel
     const [
@@ -71,7 +79,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Incentive earnings
       Incentive.aggregate([
-        { $match: { month: monthStr } },
+        { $match: { month: monthStr, ownerId: ownerObjectId } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
 
@@ -152,6 +160,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Today's classes
       Class.find({
+        ownerId,
         deletedAt: null,
         date: { $gte: todayStart, $lte: todayEnd }
       })
@@ -161,16 +170,16 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Today's earnings
       Class.aggregate([
-        { $match: { deletedAt: null, date: { $gte: todayStart, $lte: todayEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: todayStart, $lte: todayEnd } } },
         { $group: { _id: null, total: { $sum: '$paymentAmount' } } }
       ]),
 
       // Payment status for this month
-      Payment.findOne({ earningMonth: monthStr }).lean(),
+      Payment.findOne({ earningMonth: monthStr, ownerId }).lean(),
 
       // This week stats
       Class.aggregate([
-        { $match: { deletedAt: null, date: { $gte: thisWeekStart, $lte: thisWeekEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: thisWeekStart, $lte: thisWeekEnd } } },
         {
           $group: {
             _id: null,
@@ -183,7 +192,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Last week stats
       Class.aggregate([
-        { $match: { deletedAt: null, date: { $gte: lastWeekStart, $lte: lastWeekEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: lastWeekStart, $lte: lastWeekEnd } } },
         {
           $group: {
             _id: null,
@@ -254,6 +263,21 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const totalClasses = totalClassesResult;
     const uniqueStudents = uniqueStudentsResult.length;
     const avgPerClass = totalClasses > 0 ? Math.round(classEarnings / totalClasses) : 0;
+    const cycleSettings = await getPaymentCycleSettings(ownerId);
+    const paymentWindow = calculatePaymentWindow(
+      calculatePaymentMonth(monthStr),
+      cycleSettings.windowStart,
+      cycleSettings.windowEnd
+    );
+    const expectedPayment = {
+      ...(paymentStatus ?? {}),
+      earningMonth: monthStr,
+      expectedAmount: totalEarned,
+      receivedAmount: paymentStatus?.receivedAmount ?? null,
+      expectedWindowStart: paymentWindow.start,
+      expectedWindowEnd: paymentWindow.end,
+      status: paymentStatus?.status ?? 'pending',
+    };
 
     // Format breakdowns
     const classBreakdown: Record<string, number> = {};
@@ -265,7 +289,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const legacyPtmBreakdown = await legacyPtmClasses.reduce(
       async (totalsPromise, classRecord: any) => {
         const totals = await totalsPromise;
-        const payment = await calculateClassPayment('ptm', classRecord.status, classRecord.date);
+        const payment = await calculateClassPayment('ptm', classRecord.status, classRecord.date, ownerId);
         return {
           regular: totals.regular + payment.regularAmount,
           ptm: totals.ptm + payment.ptmAmount,
@@ -346,7 +370,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
       recentClasses,
       todayClasses: todayClassesResult,
       todayEarnings: todayEarningsResult[0]?.total ?? 0,
-      paymentInfo: paymentStatus ?? null,
+      paymentInfo: expectedPayment,
       weekStats,
       topStudents,
     });
@@ -357,8 +381,9 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 });
 
 // GET /monthly-history - Last 12 months of earnings
-router.get('/monthly-history', async (_req: Request, res: Response) => {
+router.get('/monthly-history', async (req: Request, res: Response) => {
   try {
+    const ownerObjectId = new mongoose.Types.ObjectId(getUserId(req));
     const now = new Date();
     const months: string[] = [];
 
@@ -371,11 +396,11 @@ router.get('/monthly-history', async (_req: Request, res: Response) => {
 
     const [classEarnings, incentiveEarnings] = await Promise.all([
       Class.aggregate([
-        { $match: { classMonth: { $in: months }, deletedAt: null } },
+        { $match: { classMonth: { $in: months }, deletedAt: null, ownerId: ownerObjectId } },
         { $group: { _id: '$classMonth', classTotal: { $sum: '$paymentAmount' }, classCount: { $sum: 1 } } }
       ]),
       Incentive.aggregate([
-        { $match: { month: { $in: months } } },
+        { $match: { month: { $in: months }, ownerId: ownerObjectId } },
         { $group: { _id: '$month', incentiveTotal: { $sum: '$amount' } } }
       ])
     ]);
@@ -394,7 +419,7 @@ router.get('/monthly-history', async (_req: Request, res: Response) => {
       month: m,
       classEarnings: classMap[m]?.total ?? 0,
       incentiveEarnings: incentiveMap[m] ?? 0,
-      totalEarnings: (classMap[m]?.total ?? 0) + (incentiveMap[m] ?? 0),
+      totalEarned: (classMap[m]?.total ?? 0) + (incentiveMap[m] ?? 0),
       classCount: classMap[m]?.count ?? 0,
     }));
 

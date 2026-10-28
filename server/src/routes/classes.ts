@@ -2,11 +2,12 @@ import { Router, Request, Response } from 'express';
 import Class from '../models/Class';
 import Student from '../models/Student';
 import { buildClassRecord } from '../utils/paymentCalculator';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
-async function getNextClassNumber(studentId: string, excludeId?: string) {
-  const filter: any = { studentId, deletedAt: null, class_no: { $ne: null } };
+async function getNextClassNumber(studentId: string, ownerId: string, excludeId?: string) {
+  const filter: any = { studentId, ownerId, deletedAt: null, class_no: { $ne: null } };
   if (excludeId) filter._id = { $ne: excludeId };
   const latest = await Class.findOne(filter).sort({ class_no: -1 }).select('class_no').lean();
   const highestClassNo = latest?.class_no ?? 0;
@@ -22,7 +23,8 @@ async function getNextClassNumber(studentId: string, excludeId?: string) {
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { month, classType, status, schedulingType, studentId, search, startDate, endDate, page = '1', limit = '50' } = req.query;
-    const filter: any = { deletedAt: null };
+    const ownerId = getUserId(req);
+    const filter: any = { deletedAt: null, ownerId };
 
     if (month) filter.classMonth = month;
     if (classType) filter.classType = classType;
@@ -33,6 +35,7 @@ router.get('/', async (req: Request, res: Response) => {
       const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = new RegExp(escapedSearch, 'i');
       const matchingStudents = await Student.find({
+        ownerId,
         $or: [{ name: searchRegex }, { course: searchRegex }]
       }).select('_id').lean();
 
@@ -71,7 +74,8 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.get('/student/:studentId/next-number', async (req: Request, res: Response) => {
   try {
-    const result = await getNextClassNumber(String(req.params.studentId));
+    const ownerId = getUserId(req);
+    const result = await getNextClassNumber(String(req.params.studentId), ownerId);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Failed to determine next class number' });
@@ -80,7 +84,7 @@ router.get('/student/:studentId/next-number', async (req: Request, res: Response
 
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const classRecord = await Class.findById(req.params.id).populate('studentId', 'name course');
+    const classRecord = await Class.findOne({ _id: req.params.id, ownerId: getUserId(req) }).populate('studentId', 'name course');
     if (!classRecord) return res.status(404).json({ error: 'Class not found' });
     res.json(classRecord);
   } catch (err) {
@@ -90,7 +94,8 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { date, time, studentId, classType, status, schedulingType, notes, confirmDuplicate } = req.body;
+    const { date, time, studentId, classType, status, schedulingType, notes, countNoShow, confirmDuplicate } = req.body;
+    const ownerId = getUserId(req);
 
     if (!date || !classType || !status || !schedulingType) {
       return res.status(400).json({ error: 'All required fields must be provided' });
@@ -99,6 +104,12 @@ router.post('/', async (req: Request, res: Response) => {
     // A student is required for all class types except demo and substitute
     if (classType !== 'demo' && classType !== 'substitute' && !studentId) {
       return res.status(400).json({ error: 'studentId is required for non-demo, non-substitute classes' });
+    }
+
+    // Verify student belongs to this user
+    if (studentId) {
+      const student = await Student.findOne({ _id: studentId, ownerId });
+      if (!student) return res.status(404).json({ error: 'Student not found' });
     }
 
     const classDate = new Date(date);
@@ -129,9 +140,10 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
-    const calculated = await buildClassRecord(classDate, classType, status);
-    const classNumber = studentId && status === 'completed'
-      ? (await getNextClassNumber(studentId)).nextClassNo
+    const calculated = await buildClassRecord(classDate, classType, status, ownerId);
+    const countsTowardClassNumber = status === 'completed' || (status === 'student_no_show' && countNoShow === true);
+    const classNumber = studentId && countsTowardClassNumber
+      ? (await getNextClassNumber(studentId, ownerId)).nextClassNo
       : null;
     if (classNumber !== null) {
       const duplicateClassNumber = await Class.exists({
@@ -148,11 +160,13 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const classRecord = new Class({
+      ownerId,
       date: classDate,
       time: time || null,
       studentId,
       classType,
       status,
+      countNoShow: status === 'student_no_show' && countNoShow === true,
       schedulingType,
       notes,
       class_no: classNumber,
@@ -169,14 +183,15 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { date, classType, status, studentId } = req.body;
+    const { date, classType, status, studentId, countNoShow } = req.body;
     const updates: any = { ...req.body };
+    const ownerId = getUserId(req);
     delete updates.class_no;
 
     // Normalize an emptied time field to null so it can be cleared on edit.
     if (updates.time !== undefined) updates.time = updates.time || null;
 
-    const existing = await Class.findById(req.params.id);
+    const existing = await Class.findOne({ _id: req.params.id, ownerId });
     if (!existing) return res.status(404).json({ error: 'Class not found' });
 
     // A student is required for all class types except demo and substitute.
@@ -191,16 +206,35 @@ router.put('/:id', async (req: Request, res: Response) => {
       const cType = effectiveClassType;
       const cStatus = status || existing.status;
 
-      const calculated = await buildClassRecord(classDate, cType, cStatus);
+      const calculated = await buildClassRecord(classDate, cType, cStatus, ownerId);
       Object.assign(updates, calculated);
     }
 
     if (studentId !== undefined && String(studentId || '') !== String(existing.studentId || '')) {
+      // Verify student belongs to this user
+      if (studentId) {
+        const student = await Student.findOne({ _id: studentId, ownerId });
+        if (!student) return res.status(404).json({ error: 'Student not found' });
+      }
       updates.class_no = null;
     }
 
-    const classRecord = await Class.findByIdAndUpdate(
-      req.params.id,
+    const effectiveStatus = status || existing.status;
+    if (effectiveStatus !== 'student_no_show') {
+      updates.countNoShow = false;
+    } else if (countNoShow !== undefined) {
+      updates.countNoShow = countNoShow === true;
+    }
+
+    if (studentId && (effectiveStatus === 'completed' || (effectiveStatus === 'student_no_show' && updates.countNoShow === true))
+      && (existing.status !== effectiveStatus || existing.countNoShow !== updates.countNoShow || existing.studentId?.toString() !== String(studentId))) {
+      updates.class_no = (await getNextClassNumber(String(studentId), ownerId, String(req.params.id))).nextClassNo;
+    } else if (effectiveStatus === 'student_no_show' && updates.countNoShow !== true) {
+      updates.class_no = null;
+    }
+
+    const classRecord = await Class.findOneAndUpdate(
+      { _id: req.params.id, ownerId },
       { $set: updates },
       { new: true, runValidators: true }
     ).populate('studentId', 'name course');
@@ -214,8 +248,9 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const classRecord = await Class.findByIdAndUpdate(
-      req.params.id,
+    const ownerId = getUserId(req);
+    const classRecord = await Class.findOneAndUpdate(
+      { _id: req.params.id, ownerId },
       { $set: { deletedAt: new Date() } },
       { new: true }
     );
@@ -228,8 +263,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 router.post('/:id/restore', async (req: Request, res: Response) => {
   try {
-    const classRecord = await Class.findByIdAndUpdate(
-      req.params.id,
+    const ownerId = getUserId(req);
+    const classRecord = await Class.findOneAndUpdate(
+      { _id: req.params.id, ownerId },
       { $set: { deletedAt: null } },
       { new: true }
     ).populate('studentId', 'name course');

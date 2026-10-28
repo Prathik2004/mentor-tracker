@@ -2,13 +2,15 @@ import { Router, Request, Response } from 'express';
 import PaymentRule from '../models/PaymentRule';
 import Class from '../models/Class';
 import { getApplicablePaymentRule, calculateClassPayment } from '../utils/paymentCalculator';
+import { getUserId } from '../middleware/auth';
 
 const router = Router();
 
 // Get all current (active) payment rules
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const rules = await PaymentRule.find({ effectiveTo: null }).sort({ classType: 1, status: 1 });
+    const ownerId = getUserId(req);
+    const rules = await PaymentRule.find({ ownerId, effectiveTo: null }).sort({ classType: 1, status: 1 });
     res.json(rules);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch payment rules' });
@@ -19,6 +21,7 @@ router.get('/', async (_req: Request, res: Response) => {
 router.put('/', async (req: Request, res: Response) => {
   try {
     const { classType, status, amount } = req.body;
+    const ownerId = getUserId(req);
 
     if (!classType || !status || amount === undefined || amount === null) {
       return res.status(400).json({ error: 'classType, status, and amount are required' });
@@ -32,6 +35,7 @@ router.put('/', async (req: Request, res: Response) => {
 
     // Find current active rule and retire it
     const currentRule = await PaymentRule.findOne({
+      ownerId,
       classType,
       status,
       effectiveTo: null,
@@ -51,12 +55,13 @@ router.put('/', async (req: Request, res: Response) => {
      */
     let effectiveFrom = now;
     if (!currentRule) {
-      const earliest = await Class.findOne({ deletedAt: null }).sort({ date: 1 }).select('date');
+      const earliest = await Class.findOne({ ownerId, deletedAt: null }).sort({ date: 1 }).select('date');
       effectiveFrom = earliest?.date ?? new Date(0);
     }
 
     // Create new rule
     const newRule = await PaymentRule.create({
+      ownerId,
       classType,
       status,
       amount,
@@ -78,6 +83,7 @@ router.put('/', async (req: Request, res: Response) => {
 router.get('/calculate', async (req: Request, res: Response) => {
   try {
     const { classType, status, date } = req.query;
+    const ownerId = getUserId(req);
 
     if (!classType || !status) {
       return res.status(400).json({ error: 'classType and status are required' });
@@ -88,7 +94,8 @@ router.get('/calculate', async (req: Request, res: Response) => {
     const result = await calculateClassPayment(
       classType as string,
       status as string,
-      classDate
+      classDate,
+      ownerId
     );
 
     res.json({
@@ -106,7 +113,8 @@ router.get('/calculate', async (req: Request, res: Response) => {
 router.get('/history', async (req: Request, res: Response) => {
   try {
     const { classType, status } = req.query;
-    const filter: any = {};
+    const ownerId = getUserId(req);
+    const filter: any = { ownerId };
     if (classType) filter.classType = classType;
     if (status) filter.status = status;
 
