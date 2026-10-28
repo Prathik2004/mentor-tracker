@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useToast } from '@/components/ui/toast'
 import { useErrorHandler } from '@/hooks/useErrorHandler'
 import { dashboardApi } from '@/api/dashboard'
 import { getCurrentMonth, getGreeting } from '@/utils/format'
