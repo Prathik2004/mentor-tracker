@@ -29,7 +29,8 @@ export function PaymentStatusCard({ stats, month }: { stats: DashboardStats; mon
     : getPaymentWindow(month, 10, 15)
 
   const received = payment?.receivedAmount ?? null
-  const difference = received !== null ? stats.totalEarned - received : null
+  const expectedAmount = payment?.expectedAmount ?? stats.totalEarned
+  const difference = received !== null ? expectedAmount - received : null
 
   return (
     <Card>
@@ -50,6 +51,7 @@ export function PaymentStatusCard({ stats, month }: { stats: DashboardStats; mon
 
         <div className="text-sm text-slate-500">
           <p className="font-medium text-slate-700">Expected Payment</p>
+          <p className="text-lg font-bold text-slate-900">{formatCurrency(expectedAmount)}</p>
           <p>{expectedWindow}</p>
         </div>
 
@@ -57,7 +59,7 @@ export function PaymentStatusCard({ stats, month }: { stats: DashboardStats; mon
           <div className="space-y-1 rounded-lg bg-slate-50 p-3 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-500">Expected</span>
-              <span className="font-medium">{formatCurrency(stats.totalEarned)}</span>
+              <span className="font-medium">{formatCurrency(expectedAmount)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Received</span>

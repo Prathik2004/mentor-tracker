@@ -2,11 +2,15 @@ import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Class from '../models/Class';
 import Incentive from '../models/Incentive';
+import Deduction from '../models/Deduction';
 import Payment from '../models/Payment';
 import {
   calculateClassPayment,
+  calculateNetPayment,
   calculatePaymentMonth,
   calculatePaymentWindow,
+  getIndiaDayBounds,
+  getIndiaWeekBounds,
   getPaymentCycleSettings,
 } from '../utils/paymentCalculator';
 import { getUserId } from '../middleware/auth';
@@ -27,26 +31,11 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const monthEnd = new Date(year, monthNum, 0, 23, 59, 59, 999);
 
     // Today boundaries
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-
-    // This week boundaries (Monday-Sunday)
-    const dayOfWeek = today.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const thisWeekStart = new Date(today);
-    thisWeekStart.setDate(today.getDate() + mondayOffset);
-    thisWeekStart.setHours(0, 0, 0, 0);
-    const thisWeekEnd = new Date(thisWeekStart);
-    thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
-    thisWeekEnd.setHours(23, 59, 59, 999);
-
-    // Last week boundaries
-    const lastWeekStart = new Date(thisWeekStart);
-    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-    const lastWeekEnd = new Date(thisWeekStart);
-    lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
-    lastWeekEnd.setHours(23, 59, 59, 999);
+    // Class dates are stored as instants; dashboard day/week boundaries are explicitly IST.
+    const { start: todayStart, end: todayEnd } = getIndiaDayBounds();
+    const { start: thisWeekStart, end: thisWeekEnd } = getIndiaWeekBounds();
+    const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastWeekEnd = new Date(thisWeekStart.getTime() - 1);
 
     const baseFilter = { classMonth: monthStr, deletedAt: null, ownerId: ownerObjectId };
 
@@ -54,6 +43,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const [
       classEarningsResult,
       incentiveEarningsResult,
+      deductionEarningsResult,
       totalClassesResult,
       uniqueStudentsResult,
       classBreakdownResult,
@@ -79,6 +69,12 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Incentive earnings
       Incentive.aggregate([
+        { $match: { month: monthStr, ownerId: ownerObjectId } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+
+      // Deductions used to calculate the net payment shown on the dashboard
+      Deduction.aggregate([
         { $match: { month: monthStr, ownerId: ownerObjectId } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
@@ -260,6 +256,8 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const classEarnings = classEarningsResult[0]?.total ?? 0;
     const incentiveEarnings = incentiveEarningsResult[0]?.total ?? 0;
     const totalEarned = classEarnings + incentiveEarnings;
+    const totalDeductions = deductionEarningsResult[0]?.total ?? 0;
+    const { netAmount } = calculateNetPayment(totalEarned, totalDeductions);
     const totalClasses = totalClassesResult;
     const uniqueStudents = uniqueStudentsResult.length;
     const avgPerClass = totalClasses > 0 ? Math.round(classEarnings / totalClasses) : 0;
@@ -272,7 +270,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const expectedPayment = {
       ...(paymentStatus ?? {}),
       earningMonth: monthStr,
-      expectedAmount: totalEarned,
+      expectedAmount: netAmount,
       receivedAmount: paymentStatus?.receivedAmount ?? null,
       expectedWindowStart: paymentWindow.start,
       expectedWindowEnd: paymentWindow.end,

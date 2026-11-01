@@ -1,6 +1,53 @@
 import PaymentRule from '../models/PaymentRule';
 import Settings from '../models/Settings';
 
+const INDIA_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
+export function getIndiaDayBounds(date = new Date()) {
+  const indiaDate = new Date(date.getTime() + INDIA_OFFSET_MS);
+  const start = Date.UTC(
+    indiaDate.getUTCFullYear(),
+    indiaDate.getUTCMonth(),
+    indiaDate.getUTCDate()
+  ) - INDIA_OFFSET_MS;
+
+  return {
+    start: new Date(start),
+    end: new Date(start + 24 * 60 * 60 * 1000 - 1),
+  };
+}
+
+export function getIndiaWeekBounds(date = new Date()) {
+  const indiaDate = new Date(date.getTime() + INDIA_OFFSET_MS);
+  const dayOfWeek = indiaDate.getUTCDay();
+  const monday = new Date(Date.UTC(
+    indiaDate.getUTCFullYear(),
+    indiaDate.getUTCMonth(),
+    indiaDate.getUTCDate()
+  ));
+  monday.setUTCDate(monday.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
+  const start = monday.getTime() - INDIA_OFFSET_MS;
+  return {
+    start: new Date(start),
+    end: new Date(start + 7 * 24 * 60 * 60 * 1000 - 1),
+  };
+}
+
+export function calculateNetPayment(grossAmount: number, deductions: number): {
+  taxableAmount: number;
+  tdsAmount: number;
+  netAmount: number;
+} {
+  const taxableAmount = Math.max(0, grossAmount - deductions);
+  const tdsAmount = Math.round(taxableAmount * 0.1);
+  return {
+    taxableAmount,
+    tdsAmount,
+    netAmount: taxableAmount - tdsAmount,
+  };
+}
+
 export async function getPaymentCycleSettings(ownerId: string) {
   const windowStart = await Settings.findOne({ ownerId, key: 'payment_window_start' });
   const windowEnd = await Settings.findOne({ ownerId, key: 'payment_window_end' });

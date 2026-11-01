@@ -22,6 +22,9 @@ import {
   getApplicablePaymentRule,
   calculateClassPayment,
   buildClassRecord,
+  calculateNetPayment,
+  getIndiaDayBounds,
+  getIndiaWeekBounds,
 } from './paymentCalculator';
 
 const mockedFindOne = PaymentRule.findOne as ReturnType<typeof vi.fn>;
@@ -55,6 +58,34 @@ describe('calculateClassMonth', () => {
     expect(calculateClassMonth(new Date(2026, 7, 8))).toBe('2026-08');
     expect(calculateClassMonth(new Date(2026, 0, 1))).toBe('2026-01');
     expect(calculateClassMonth(new Date(2026, 11, 31))).toBe('2026-12');
+  });
+
+  describe('calculateNetPayment', () => {
+    it('deducts other deductions before calculating 10% TDS', () => {
+      expect(calculateNetPayment(10000, 1000)).toEqual({
+        taxableAmount: 9000,
+        tdsAmount: 900,
+        netAmount: 8100,
+      });
+    });
+
+    it('does not produce a negative taxable amount', () => {
+      expect(calculateNetPayment(500, 1000).netAmount).toBe(0);
+    });
+  });
+
+  describe('India day and week bounds', () => {
+    it('starts the India day at midnight IST', () => {
+      const { start, end } = getIndiaDayBounds(new Date('2026-11-02T00:00:00.000Z'));
+      expect(start.toISOString()).toBe('2026-11-01T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-02T18:29:59.999Z');
+    });
+
+    it('returns Monday-Sunday week bounds in IST', () => {
+      const { start, end } = getIndiaWeekBounds(new Date('2026-11-04T12:00:00.000Z'));
+      expect(start.toISOString()).toBe('2026-11-01T18:30:00.000Z');
+      expect(end.toISOString()).toBe('2026-11-08T18:29:59.999Z');
+    });
   });
 
   it('handles different years', () => {
