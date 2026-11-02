@@ -16,9 +16,10 @@ import { BookOpen, Plus } from 'lucide-react'
 export function Classes() {
   const [searchParams] = useSearchParams()
   const { toast } = useToast()
+  const studentId = searchParams.get('studentId') || searchParams.get('student') || undefined
   const [filters, setFilters] = useState<ClassFilters>(() => ({
-    month: getCurrentMonth(),
-    studentId: searchParams.get('studentId') || searchParams.get('student') || undefined,
+    month: studentId ? undefined : getCurrentMonth(),
+    studentId,
     page: 1,
     limit: 20,
   }))
