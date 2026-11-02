@@ -38,6 +38,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     const lastWeekEnd = new Date(thisWeekStart.getTime() - 1);
 
     const baseFilter = { classMonth: monthStr, deletedAt: null, ownerId: ownerObjectId };
+    const countBaseFilter: any = { ...baseFilter, status: { $ne: 'substitute_mentor' } };
 
     // Run multiple aggregations in parallel
     const [
@@ -63,7 +64,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     ] = await Promise.all([
       // Class earnings
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: null, total: { $sum: '$paymentAmount' } } }
       ]),
 
@@ -80,21 +81,21 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
       ]),
 
       // Total classes count
-      Class.countDocuments(baseFilter),
+      Class.countDocuments(countBaseFilter),
 
       // Unique students (exclude null — demo classes have no student)
-      Class.distinct('studentId', { ...baseFilter, studentId: { $ne: null } }),
+      Class.distinct('studentId', { ...countBaseFilter, studentId: { $ne: null } }),
 
       // Class breakdown by type
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: '$classType', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
       ]),
 
       // Earnings by class type
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         {
           $group: {
             _id: '$classType',
@@ -124,26 +125,26 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
       ]),
 
       Class.find({
-        ...baseFilter,
+        ...countBaseFilter,
         classType: 'ptm',
         regularPaymentAmount: { $exists: false },
       }).select('date status').lean(),
 
       // No-show earnings total
       Class.aggregate([
-        { $match: { ...baseFilter, status: 'student_no_show' } },
+        { $match: { ...countBaseFilter, status: 'student_no_show' } },
         { $group: { _id: null, total: { $sum: '$paymentAmount' } } }
       ]),
 
       // Status breakdown
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
 
       // Scheduling breakdown
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: '$schedulingType', count: { $sum: 1 } } }
       ]),
 
@@ -166,7 +167,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Today's earnings
       Class.aggregate([
-        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: todayStart, $lte: todayEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, status: { $ne: 'substitute_mentor' }, date: { $gte: todayStart, $lte: todayEnd } } },
         { $group: { _id: null, total: { $sum: '$paymentAmount' } } }
       ]),
 
@@ -175,7 +176,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // This week stats
       Class.aggregate([
-        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: thisWeekStart, $lte: thisWeekEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, status: { $ne: 'substitute_mentor' }, date: { $gte: thisWeekStart, $lte: thisWeekEnd } } },
         {
           $group: {
             _id: null,
@@ -188,7 +189,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Last week stats
       Class.aggregate([
-        { $match: { ownerId: ownerObjectId, deletedAt: null, date: { $gte: lastWeekStart, $lte: lastWeekEnd } } },
+        { $match: { ownerId: ownerObjectId, deletedAt: null, status: { $ne: 'substitute_mentor' }, date: { $gte: lastWeekStart, $lte: lastWeekEnd } } },
         {
           $group: {
             _id: null,
@@ -201,7 +202,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Top students by class count
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: '$studentId', classCount: { $sum: 1 }, earnings: { $sum: '$paymentAmount' } } },
         { $sort: { classCount: -1 } },
         { $limit: 5 },
@@ -227,7 +228,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
 
       // Top students by earnings
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         { $group: { _id: '$studentId', classCount: { $sum: 1 }, earnings: { $sum: '$paymentAmount' } } },
         { $sort: { earnings: -1 } },
         { $limit: 5 },
@@ -394,7 +395,7 @@ router.get('/monthly-history', async (req: Request, res: Response) => {
 
     const [classEarnings, incentiveEarnings] = await Promise.all([
       Class.aggregate([
-        { $match: { classMonth: { $in: months }, deletedAt: null, ownerId: ownerObjectId } },
+        { $match: { classMonth: { $in: months }, deletedAt: null, ownerId: ownerObjectId, status: { $ne: 'substitute_mentor' } } },
         { $group: { _id: '$classMonth', classTotal: { $sum: '$paymentAmount' }, classCount: { $sum: 1 } } }
       ]),
       Incentive.aggregate([
@@ -455,7 +456,7 @@ router.get('/insights/:month', async (req: Request, res: Response) => {
       prevStudentCount,
     ] = await Promise.all([
       Class.aggregate([
-        { $match: { ...baseFilter, classMonth: month } },
+        { $match: { ...baseFilter, classMonth: month, status: { $ne: 'substitute_mentor' } } },
         {
           $group: {
             _id: null,
@@ -467,7 +468,7 @@ router.get('/insights/:month', async (req: Request, res: Response) => {
         }
       ]),
       Class.aggregate([
-        { $match: { ...baseFilter, classMonth: prevMonthStr } },
+        { $match: { ...baseFilter, classMonth: prevMonthStr, status: { $ne: 'substitute_mentor' } } },
         {
           $group: {
             _id: null,
@@ -487,16 +488,16 @@ router.get('/insights/:month', async (req: Request, res: Response) => {
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
       Class.aggregate([
-        { $match: { ...baseFilter, classMonth: month } },
+        { $match: { ...baseFilter, classMonth: month, status: { $ne: 'substitute_mentor' } } },
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]),
       Class.aggregate([
-        { $match: { ...baseFilter, classMonth: month } },
+        { $match: { ...baseFilter, classMonth: month, status: { $ne: 'substitute_mentor' } } },
         { $group: { _id: '$classType', count: { $sum: 1 }, earnings: { $sum: '$paymentAmount' } } },
         { $sort: { earnings: -1 } }
       ]),
-      Class.distinct('studentId', { ...baseFilter, classMonth: month, studentId: { $ne: null } }),
-      Class.distinct('studentId', { ...baseFilter, classMonth: prevMonthStr, studentId: { $ne: null } }),
+      Class.distinct('studentId', { ...baseFilter, classMonth: month, status: { $ne: 'substitute_mentor' }, studentId: { $ne: null } }),
+      Class.distinct('studentId', { ...baseFilter, classMonth: prevMonthStr, status: { $ne: 'substitute_mentor' }, studentId: { $ne: null } }),
     ]);
 
     const curr = currentStats[0] ?? { totalClasses: 0, totalEarnings: 0, completedCount: 0, noShowCount: 0 };

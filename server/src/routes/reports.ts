@@ -14,6 +14,7 @@ router.get('/monthly/:month', async (req: Request, res: Response) => {
     const { month } = req.params;
     const ownerId = getUserId(req);
     const baseFilter = { classMonth: month, deletedAt: null, ownerId };
+    const countBaseFilter = { ...baseFilter, status: { $ne: 'substitute_mentor' } };
 
     const [classes, incentives, payment, summary, studentBreakdown, dailyBreakdown] = await Promise.all([
       Class.find(baseFilter)
@@ -26,7 +27,7 @@ router.get('/monthly/:month', async (req: Request, res: Response) => {
       Payment.findOne({ earningMonth: month, ownerId }).lean(),
 
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         {
           $group: {
             _id: null,
@@ -41,7 +42,7 @@ router.get('/monthly/:month', async (req: Request, res: Response) => {
       ]),
 
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         {
           $group: {
             _id: '$studentId',
@@ -72,7 +73,7 @@ router.get('/monthly/:month', async (req: Request, res: Response) => {
       ]),
 
       Class.aggregate([
-        { $match: baseFilter },
+        { $match: countBaseFilter },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
@@ -118,7 +119,11 @@ router.get('/student/:studentId', async (req: Request, res: Response) => {
     const student = await Student.findById(studentId).lean();
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
-    const filter: any = { studentId: new mongoose.Types.ObjectId(studentId), deletedAt: null };
+    const filter: any = {
+      studentId: new mongoose.Types.ObjectId(studentId),
+      deletedAt: null,
+    };
+    const countFilter = { ...filter, status: { $ne: 'substitute_mentor' } };
     if (startDate || endDate) {
       filter.date = {};
       if (startDate) filter.date.$gte = new Date(startDate as string);
@@ -129,7 +134,7 @@ router.get('/student/:studentId', async (req: Request, res: Response) => {
       Class.find(filter).sort({ date: -1 }).lean(),
 
       Class.aggregate([
-        { $match: filter },
+        { $match: countFilter },
         {
           $group: {
             _id: '$classMonth',
@@ -143,7 +148,7 @@ router.get('/student/:studentId', async (req: Request, res: Response) => {
       ]),
 
       Class.aggregate([
-        { $match: filter },
+        { $match: countFilter },
         {
           $group: {
             _id: null,
@@ -188,7 +193,7 @@ router.get('/yearly/:year', async (req: Request, res: Response) => {
 
     const [monthlyClassData, monthlyIncentiveData, payments, yearlyStats] = await Promise.all([
       Class.aggregate([
-        { $match: { classMonth: { $in: months }, deletedAt: null } },
+        { $match: { classMonth: { $in: months }, deletedAt: null, status: { $ne: 'substitute_mentor' } } },
         {
           $group: {
             _id: '$classMonth',
@@ -212,7 +217,7 @@ router.get('/yearly/:year', async (req: Request, res: Response) => {
       Payment.find({ earningMonth: { $in: months } }).sort({ earningMonth: 1 }).lean(),
 
       Class.aggregate([
-        { $match: { classMonth: { $in: months }, deletedAt: null } },
+        { $match: { classMonth: { $in: months }, deletedAt: null, status: { $ne: 'substitute_mentor' } } },
         {
           $group: {
             _id: null,

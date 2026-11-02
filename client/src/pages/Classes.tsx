@@ -70,7 +70,9 @@ export function Classes() {
         />
       ) : (
         <>
-          <p className="text-sm text-slate-500">{data.total} {data.total === 1 ? 'class' : 'classes'} found</p>
+          <p className="text-sm text-slate-500">
+            {data.countedTotal ?? data.total} {(data.countedTotal ?? data.total) === 1 ? 'class' : 'classes'} found
+          </p>
           <div className="space-y-3">
             {data.classes.map(cls => (
               <ClassCard key={cls._id} classRecord={cls} onEdit={setEditingClass} />

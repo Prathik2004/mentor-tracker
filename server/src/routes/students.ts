@@ -63,7 +63,12 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const ownerId = getUserId(req);
-    const classCount = await Class.countDocuments({ ownerId, studentId: req.params.id, deletedAt: null });
+    const classCount = await Class.countDocuments({
+      ownerId,
+      studentId: req.params.id,
+      deletedAt: null,
+      status: { $ne: 'substitute_mentor' },
+    });
     if (classCount > 0) {
       return res.status(400).json({ error: `Cannot delete student with ${classCount} associated classes` });
     }

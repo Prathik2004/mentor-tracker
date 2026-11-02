@@ -122,6 +122,7 @@ export interface MonthlyHistory {
 export interface ClassesResponse {
   classes: ClassRecord[];
   total: number;
+  countedTotal?: number;
   page: number;
   totalPages: number;
 }

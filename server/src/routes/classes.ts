@@ -7,7 +7,13 @@ import { getUserId } from '../middleware/auth';
 const router = Router();
 
 async function getNextClassNumber(studentId: string, ownerId: string, excludeId?: string) {
-  const filter: any = { studentId, ownerId, deletedAt: null, class_no: { $ne: null } };
+  const filter: any = {
+    studentId,
+    ownerId,
+    deletedAt: null,
+    status: { $ne: 'substitute_mentor' },
+    class_no: { $ne: null },
+  };
   if (excludeId) filter._id = { $ne: excludeId };
   const latest = await Class.findOne(filter).sort({ class_no: -1 }).select('class_no').lean();
   const highestClassNo = latest?.class_no ?? 0;
@@ -57,16 +63,18 @@ router.get('/', async (req: Request, res: Response) => {
     const limitNum = parseInt(limit as string, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const [classes, total] = await Promise.all([
+    const countFilter = { ...filter, status: { $ne: 'substitute_mentor' } };
+    const [classes, total, countedTotal] = await Promise.all([
       Class.find(filter)
         .populate('studentId', 'name course')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum),
-      Class.countDocuments(filter)
+      Class.countDocuments(filter),
+      Class.countDocuments(countFilter)
     ]);
 
-    res.json({ classes, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+    res.json({ classes, total, countedTotal, page: pageNum, totalPages: Math.ceil(total / limitNum) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch classes' });
   }
@@ -141,10 +149,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const calculated = await buildClassRecord(classDate, classType, status, ownerId);
-    const countsTowardClassNumber =
-      status === 'completed' ||
-      status === 'substitute_mentor' ||
-      (status === 'student_no_show' && countNoShow === true);
+    const countsTowardClassNumber = status === 'completed' || (status === 'student_no_show' && countNoShow === true);
     const classNumber = studentId && countsTowardClassNumber
       ? (await getNextClassNumber(studentId, ownerId)).nextClassNo
       : null;
@@ -231,12 +236,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     const countsTowardClassNumber =
       effectiveStatus === 'completed' ||
-      effectiveStatus === 'substitute_mentor' ||
       (effectiveStatus === 'student_no_show' && updates.countNoShow === true);
     if (studentId && countsTowardClassNumber
       && (existing.status !== effectiveStatus || existing.countNoShow !== updates.countNoShow || existing.studentId?.toString() !== String(studentId))) {
       updates.class_no = (await getNextClassNumber(String(studentId), ownerId, String(req.params.id))).nextClassNo;
-    } else if (effectiveStatus === 'student_no_show' && updates.countNoShow !== true) {
+    } else if (
+      (effectiveStatus === 'student_no_show' && updates.countNoShow !== true) ||
+      effectiveStatus === 'substitute_mentor'
+    ) {
       updates.class_no = null;
     }
 
