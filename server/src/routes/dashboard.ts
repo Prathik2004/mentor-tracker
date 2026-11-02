@@ -314,7 +314,7 @@ router.get('/stats/:month', async (req: Request, res: Response) => {
     earningsBreakdown['incentives'] = { total: incentiveEarnings, count: 0 };
 
     const statusBreakdown: Record<string, number> = {
-      completed: 0, student_no_show: 0, cancelled: 0, rescheduled: 0
+      completed: 0, student_no_show: 0, cancelled: 0, rescheduled: 0, substitute_mentor: 0
     };
     statusBreakdownResult.forEach((item: any) => {
       statusBreakdown[item._id] = item.count;

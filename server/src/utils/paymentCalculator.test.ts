@@ -165,6 +165,17 @@ describe('calculateClassPayment', () => {
     expect(amount).toBe(0);
   });
 
+  it('returns 0 for classes taken by a substitute mentor', async () => {
+    const { amount, rule } = await calculateClassPayment(
+      'regular',
+      'substitute_mentor',
+      new Date(2026, 7, 8),
+      'test-user-id'
+    );
+    expect(amount).toBe(0);
+    expect(rule).toBeNull();
+  });
+
   it('returns 0 when no rule exists', async () => {
     mockRuleChain(null);
     const { amount } = await calculateClassPayment('regular', 'completed', new Date(2026, 7, 8), 'test-user-id');

@@ -40,7 +40,7 @@ export interface ClassRecord {
 }
 
 export type ClassType = 'regular' | 'demo' | 'substitute' | 'ptm';
-export type ClassStatus = 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled';
+export type ClassStatus = 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled' | 'substitute_mentor';
 export type SchedulingType = 'scheduled' | 'on_spot';
 export type PaymentStatus = 'pending' | 'received' | 'partially_received' | 'disputed';
 
@@ -206,6 +206,7 @@ export const CLASS_STATUS_LABELS: Record<ClassStatus, string> = {
   student_no_show: 'Student No-show',
   cancelled: 'Cancelled',
   rescheduled: 'Rescheduled',
+  substitute_mentor: 'Taken by Substitute Mentor',
 };
 
 export const SCHEDULING_TYPE_LABELS: Record<SchedulingType, string> = {

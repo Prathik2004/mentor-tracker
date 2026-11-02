@@ -109,7 +109,7 @@ export async function calculateClassPayment(
   classDate: Date,
   ownerId: string
 ) {
-  if (status === 'cancelled' || status === 'rescheduled') {
+  if (status === 'cancelled' || status === 'rescheduled' || status === 'substitute_mentor') {
     return { amount: 0, rule: null, regularAmount: 0, ptmAmount: 0 };
   }
 

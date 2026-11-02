@@ -8,7 +8,7 @@ export interface IClass extends Document {
   /** Start time of the class as "HH:MM" (24h). Optional. */
   time?: string | null;
   classType: 'regular' | 'demo' | 'substitute' | 'ptm';
-  status: 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled';
+  status: 'completed' | 'student_no_show' | 'cancelled' | 'rescheduled' | 'substitute_mentor';
   countNoShow: boolean;
   schedulingType: 'scheduled' | 'on_spot';
   paymentAmount: number;
@@ -51,7 +51,7 @@ const ClassSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['completed', 'student_no_show', 'cancelled', 'rescheduled'],
+    enum: ['completed', 'student_no_show', 'cancelled', 'rescheduled', 'substitute_mentor'],
     required: true
   },
   countNoShow: { type: Boolean, default: false },

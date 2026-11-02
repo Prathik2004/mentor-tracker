@@ -141,7 +141,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const calculated = await buildClassRecord(classDate, classType, status, ownerId);
-    const countsTowardClassNumber = status === 'completed' || (status === 'student_no_show' && countNoShow === true);
+    const countsTowardClassNumber =
+      status === 'completed' ||
+      status === 'substitute_mentor' ||
+      (status === 'student_no_show' && countNoShow === true);
     const classNumber = studentId && countsTowardClassNumber
       ? (await getNextClassNumber(studentId, ownerId)).nextClassNo
       : null;
@@ -226,7 +229,11 @@ router.put('/:id', async (req: Request, res: Response) => {
       updates.countNoShow = countNoShow === true;
     }
 
-    if (studentId && (effectiveStatus === 'completed' || (effectiveStatus === 'student_no_show' && updates.countNoShow === true))
+    const countsTowardClassNumber =
+      effectiveStatus === 'completed' ||
+      effectiveStatus === 'substitute_mentor' ||
+      (effectiveStatus === 'student_no_show' && updates.countNoShow === true);
+    if (studentId && countsTowardClassNumber
       && (existing.status !== effectiveStatus || existing.countNoShow !== updates.countNoShow || existing.studentId?.toString() !== String(studentId))) {
       updates.class_no = (await getNextClassNumber(String(studentId), ownerId, String(req.params.id))).nextClassNo;
     } else if (effectiveStatus === 'student_no_show' && updates.countNoShow !== true) {
