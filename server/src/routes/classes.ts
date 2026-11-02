@@ -11,7 +11,6 @@ async function getNextClassNumber(studentId: string, ownerId: string, excludeId?
     studentId,
     ownerId,
     deletedAt: null,
-    status: { $ne: 'substitute_mentor' },
     class_no: { $ne: null },
   };
   if (excludeId) filter._id = { $ne: excludeId };
@@ -149,7 +148,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const calculated = await buildClassRecord(classDate, classType, status, ownerId);
-    const countsTowardClassNumber = status === 'completed' || (status === 'student_no_show' && countNoShow === true);
+    const countsTowardClassNumber =
+      status === 'completed' ||
+      status === 'substitute_mentor' ||
+      (status === 'student_no_show' && countNoShow === true);
     const classNumber = studentId && countsTowardClassNumber
       ? (await getNextClassNumber(studentId, ownerId)).nextClassNo
       : null;
@@ -236,13 +238,16 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     const countsTowardClassNumber =
       effectiveStatus === 'completed' ||
+      effectiveStatus === 'substitute_mentor' ||
       (effectiveStatus === 'student_no_show' && updates.countNoShow === true);
     if (studentId && countsTowardClassNumber
-      && (existing.status !== effectiveStatus || existing.countNoShow !== updates.countNoShow || existing.studentId?.toString() !== String(studentId))) {
+      && (existing.status !== effectiveStatus ||
+        existing.countNoShow !== updates.countNoShow ||
+        existing.studentId?.toString() !== String(studentId) ||
+        existing.class_no == null)) {
       updates.class_no = (await getNextClassNumber(String(studentId), ownerId, String(req.params.id))).nextClassNo;
     } else if (
-      (effectiveStatus === 'student_no_show' && updates.countNoShow !== true) ||
-      effectiveStatus === 'substitute_mentor'
+      effectiveStatus === 'student_no_show' && updates.countNoShow !== true
     ) {
       updates.class_no = null;
     }
