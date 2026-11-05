@@ -63,6 +63,9 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
   const [countNoShow, setCountNoShow] = useState(false)
   const [schedulingType, setSchedulingType] = useState<SchedulingType>()
   const [notes, setNotes] = useState('')
+  const [disputeRaised, setDisputeRaised] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [disputeAmount, setDisputeAmount] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
   const [addingStudent, setAddingStudent] = useState(false)
@@ -81,6 +84,9 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
       setCountNoShow(initialClass.countNoShow ?? false)
       setSchedulingType(initialClass.schedulingType)
       setNotes(initialClass.notes || '')
+      setDisputeRaised(initialClass.dispute?.raised ?? false)
+      setDisputeReason(initialClass.dispute?.reason || '')
+      setDisputeAmount(initialClass.dispute?.deductedAmount != null ? String(initialClass.dispute.deductedAmount) : '')
       setSearchTerm('')
       setShowStudentList(false)
       setDuplicateConfirm(false)
@@ -114,6 +120,9 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
         countNoShow,
         schedulingType: schedulingType!,
         notes: notes || undefined,
+        disputeRaised,
+        disputeReason: disputeRaised ? disputeReason.trim() : undefined,
+        disputeAmount: disputeRaised ? Number(disputeAmount) : undefined,
         confirmDuplicate: duplicateConfirm,
       }
       return isEdit && initialClass
@@ -149,11 +158,16 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
     setCountNoShow(false)
     setSchedulingType(undefined)
     setNotes('')
+    setDisputeRaised(false)
+    setDisputeReason('')
+    setDisputeAmount('')
     setSearchTerm('')
     setDuplicateConfirm(false)
   }
 
-  const canSubmit = !!date && !!classType && !!status && !!schedulingType && (classType === 'demo' || classType === 'substitute' ? true : !!studentId)
+  const canSubmit = !!date && !!classType && !!status && !!schedulingType
+    && (classType === 'demo' || classType === 'substitute' ? true : !!studentId)
+    && (!disputeRaised || (!!disputeReason.trim() && disputeAmount !== '' && Number(disputeAmount) >= 0 && (!estimate || Number(disputeAmount) <= Number(estimate.amount))))
 
   const selectedStudent = students?.find(s => s._id === studentId)
 
@@ -316,6 +330,30 @@ export function ClassFormDialog({ open, onOpenChange, initialClass }: ClassFormD
                 <span className="block text-xs text-amber-700">If checked, this class uses the next class number. If unchecked, the next class number stays available.</span>
               </span>
             </label>
+          )}
+
+          <label className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+            <input
+              type="checkbox"
+              checked={disputeRaised}
+              onChange={(e) => setDisputeRaised(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-red-300 text-slate-900 focus:ring-slate-950"
+            />
+            <span className="font-medium">Is a payment dispute raised?</span>
+          </label>
+
+          {disputeRaised && (
+            <div className="space-y-3 rounded-lg border border-red-200 bg-red-50/50 p-3">
+              <div>
+                <Label htmlFor="dispute-reason">Dispute reason</Label>
+                <Textarea id="dispute-reason" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Explain why the penalty should be reversed." className="mt-1.5 bg-white" />
+              </div>
+              <div>
+                <Label htmlFor="dispute-amount">Amount deducted</Label>
+                <Input id="dispute-amount" type="number" min="0" step="0.01" value={disputeAmount} onChange={(e) => setDisputeAmount(e.target.value)} className="mt-1.5 bg-white" />
+                {estimate && <p className="mt-1 text-xs text-red-700">Maximum: ₹{Number(estimate.amount).toLocaleString('en-IN')}</p>}
+              </div>
+            </div>
           )}
 
           {/* Notes */}

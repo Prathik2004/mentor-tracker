@@ -12,8 +12,19 @@ export interface IClass extends Document {
   countNoShow: boolean;
   schedulingType: 'scheduled' | 'on_spot';
   paymentAmount: number;
+  originalPaymentAmount: number;
   regularPaymentAmount: number;
   ptmPaymentAmount: number;
+  dispute?: {
+    raised: boolean;
+    reason?: string;
+    deductedAmount: number;
+    status: 'open' | 'resolved';
+    paymentReversed: boolean;
+    reversedAmount: number;
+    resolvedAt?: Date | null;
+    resolutionNotes?: string;
+  };
   paymentRuleSnapshot: {
     classType: string;
     status: string;
@@ -61,8 +72,19 @@ const ClassSchema = new Schema({
     required: true
   },
   paymentAmount: { type: Number, required: true, min: 0 },
+  originalPaymentAmount: { type: Number, required: true, min: 0, default: 0 },
   regularPaymentAmount: { type: Number, required: true, min: 0, default: 0 },
   ptmPaymentAmount: { type: Number, required: true, min: 0, default: 0 },
+  dispute: {
+    raised: { type: Boolean, default: false },
+    reason: { type: String, trim: true },
+    deductedAmount: { type: Number, min: 0, default: 0 },
+    status: { type: String, enum: ['open', 'resolved'], default: 'open' },
+    paymentReversed: { type: Boolean, default: false },
+    reversedAmount: { type: Number, min: 0, default: 0 },
+    resolvedAt: { type: Date, default: null },
+    resolutionNotes: { type: String, trim: true },
+  },
   paymentRuleSnapshot: {
     classType: { type: String },
     status: { type: String },

@@ -17,7 +17,7 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/toast'
-import { Clock, Pencil, Trash2 } from 'lucide-react'
+import { Clock, Pencil, Trash2, AlertTriangle } from 'lucide-react'
 
 export function ClassCard({ classRecord, onEdit }: { classRecord: ClassRecord; onEdit?: (cls: ClassRecord) => void }) {
   const queryClient = useQueryClient()
@@ -62,7 +62,14 @@ export function ClassCard({ classRecord, onEdit }: { classRecord: ClassRecord; o
                   )}
                 </p>
               </div>
-              <span className="text-lg font-bold text-slate-900 shrink-0">{formatCurrency(cls.paymentAmount)}</span>
+              <div className="text-right shrink-0">
+                <span className="text-lg font-bold text-slate-900 block">{formatCurrency(cls.paymentAmount)}</span>
+                {cls.dispute?.raised && cls.dispute.deductedAmount > 0 && (
+                  <span className="text-[11px] text-red-600 flex items-center gap-1 justify-end">
+                    <AlertTriangle className="h-3 w-3" /> {cls.dispute.status === 'resolved' && cls.dispute.paymentReversed ? 'Reversed' : 'Disputed'}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-1.5 mt-2">
               <Badge style={{ background: `${typeColor}20`, color: typeColor }} className="border-0">

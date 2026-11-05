@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import Class from '../models/Class';
 import Student from '../models/Student';
-import { buildClassRecord } from '../utils/paymentCalculator';
+import { applyClassDispute, buildClassRecord } from '../utils/paymentCalculator';
 import { getUserId } from '../middleware/auth';
 
 const router = Router();
@@ -101,7 +101,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { date, time, studentId, classType, status, schedulingType, notes, countNoShow, confirmDuplicate } = req.body;
+    const { date, time, studentId, classType, status, schedulingType, notes, countNoShow, confirmDuplicate, disputeRaised, disputeReason, disputeAmount } = req.body;
     const ownerId = getUserId(req);
 
     if (!date || !classType || !status || !schedulingType) {
@@ -148,6 +148,19 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const calculated = await buildClassRecord(classDate, classType, status, ownerId);
+    const deductedAmount = Number(disputeAmount ?? 0);
+    if (disputeRaised && (!disputeReason?.trim() || !Number.isFinite(deductedAmount) || deductedAmount < 0 || deductedAmount > calculated.paymentAmount)) {
+      return res.status(400).json({ error: 'A reason and a valid deduction amount within the class payment are required' });
+    }
+    const dispute = disputeRaised ? {
+      raised: true,
+      reason: String(disputeReason).trim(),
+      deductedAmount,
+      status: 'open' as const,
+      paymentReversed: false,
+      reversedAmount: 0,
+    } : undefined;
+    const payable = applyClassDispute(calculated, dispute);
     const countsTowardClassNumber =
       status === 'completed' ||
       status === 'substitute_mentor' ||
@@ -180,7 +193,8 @@ router.post('/', async (req: Request, res: Response) => {
       schedulingType,
       notes,
       class_no: classNumber,
-      ...calculated
+      ...payable,
+      dispute
     });
 
     await classRecord.save();
@@ -193,7 +207,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { date, classType, status, studentId, countNoShow } = req.body;
+    const { date, classType, status, studentId, countNoShow, disputeRaised, disputeReason, disputeAmount } = req.body;
     const updates: any = { ...req.body };
     const ownerId = getUserId(req);
     delete updates.class_no;
@@ -217,7 +231,37 @@ router.put('/:id', async (req: Request, res: Response) => {
       const cStatus = status || existing.status;
 
       const calculated = await buildClassRecord(classDate, cType, cStatus, ownerId);
-      Object.assign(updates, calculated);
+      const existingDispute = existing.dispute?.raised ? existing.dispute : undefined;
+      const dispute = disputeRaised === undefined ? existingDispute : disputeRaised ? {
+        raised: true,
+        reason: String(disputeReason ?? existing.dispute?.reason ?? '').trim(),
+        deductedAmount: Number(disputeAmount ?? existing.dispute?.deductedAmount ?? 0),
+        status: 'open' as const,
+        paymentReversed: false,
+        reversedAmount: 0,
+      } : undefined;
+      if (dispute?.raised && (!dispute.reason || !Number.isFinite(dispute.deductedAmount) || dispute.deductedAmount < 0 || dispute.deductedAmount > calculated.paymentAmount)) {
+        return res.status(400).json({ error: 'A reason and a valid deduction amount within the class payment are required' });
+      }
+      Object.assign(updates, applyClassDispute(calculated, dispute), { dispute });
+    } else if (disputeRaised !== undefined) {
+      const gross = existing.originalPaymentAmount || existing.paymentAmount;
+      const dispute = disputeRaised ? {
+        raised: true,
+        reason: String(disputeReason ?? existing.dispute?.reason ?? '').trim(),
+        deductedAmount: Number(disputeAmount ?? existing.dispute?.deductedAmount ?? 0),
+        status: 'open' as const,
+        paymentReversed: false,
+        reversedAmount: 0,
+      } : undefined;
+      if (dispute?.raised && (!dispute.reason || !Number.isFinite(dispute.deductedAmount) || dispute.deductedAmount < 0 || dispute.deductedAmount > gross)) {
+        return res.status(400).json({ error: 'A reason and a valid deduction amount within the class payment are required' });
+      }
+      Object.assign(updates, {
+        paymentAmount: Math.max(0, Math.min(gross, gross - (dispute?.deductedAmount ?? 0))),
+        originalPaymentAmount: gross,
+        dispute,
+      });
     }
 
     if (studentId !== undefined && String(studentId || '') !== String(existing.studentId || '')) {

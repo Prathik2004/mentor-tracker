@@ -6,7 +6,8 @@ import { dashboardApi } from '@/api/dashboard'
 import { paymentsApi } from '@/api/payments'
 import { incentivesApi } from '@/api/incentives'
 import { deductionsApi } from '@/api/deductions'
-import type { PaymentStatus } from '@/types'
+import { disputesApi } from '@/api/classes'
+import type { ClassRecord, PaymentStatus } from '@/types'
 import { PAYMENT_STATUS_LABELS } from '@/types'
 import { getCurrentMonth, formatMonth, formatCurrency, formatDate, formatMonthShort } from '@/utils/format'
 import { MonthPicker } from '@/components/ui/month-picker'
@@ -38,6 +39,10 @@ export function Earnings() {
   const [deductionType, setDeductionType] = useState('')
   const [deductionAmount, setDeductionAmount] = useState('')
   const [deductionNotes, setDeductionNotes] = useState('')
+  const [resolvingDispute, setResolvingDispute] = useState<ClassRecord | null>(null)
+  const [paymentReversed, setPaymentReversed] = useState(false)
+  const [reversedAmount, setReversedAmount] = useState('')
+  const [resolutionNotes, setResolutionNotes] = useState('')
 
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -73,6 +78,12 @@ export function Earnings() {
     retry: 2,
   })
 
+  const { data: disputes, error: disputesError } = useQuery({
+    queryKey: ['disputes', month],
+    queryFn: () => disputesApi.getAll(month),
+    retry: 2,
+  })
+
   // Show error toasts
   useEffect(() => {
     if (statsError) handleError(statsError, 'Failed to load earnings overview')
@@ -80,7 +91,8 @@ export function Earnings() {
     if (paymentsError) handleError(paymentsError, 'Failed to load payments')
     if (incentivesError) handleError(incentivesError, 'Failed to load incentives')
     if (deductionsError) handleError(deductionsError, 'Failed to load deductions')
-  }, [statsError, historyError, paymentsError, incentivesError, deductionsError, handleError])
+    if (disputesError) handleError(disputesError, 'Failed to load disputes')
+  }, [statsError, historyError, paymentsError, incentivesError, deductionsError, disputesError, handleError])
 
   const addDeduction = useMutation({
     mutationFn: () => deductionsApi.create({
@@ -106,6 +118,23 @@ export function Earnings() {
       toast('Deduction deleted', 'success')
     },
     onError: (error) => handleError(error, 'Failed to delete deduction'),
+  })
+
+  const resolveDispute = useMutation({
+    mutationFn: () => disputesApi.resolve(resolvingDispute!._id, {
+      paymentReversed,
+      reversedAmount: paymentReversed ? Number(reversedAmount) : 0,
+      resolutionNotes: resolutionNotes.trim() || undefined,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disputes', month] })
+      queryClient.invalidateQueries({ queryKey: ['classes'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['payments'] })
+      toast('Dispute resolved', 'success')
+      setResolvingDispute(null)
+    },
+    onError: (error) => handleError(error, 'Failed to resolve dispute'),
   })
 
   const updatePayment = useMutation({
@@ -312,6 +341,75 @@ export function Earnings() {
       </Card>
 
       {/* History */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-slate-500">Class Disputes · {formatMonth(month)}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!disputes || disputes.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">No disputes this month</p>
+          ) : (
+            <ul className="space-y-3">
+              {disputes.map(dispute => {
+                const studentName = dispute.studentId && typeof dispute.studentId === 'object' ? dispute.studentId.name : dispute.classType
+                return (
+                  <li key={dispute._id} className="rounded-lg border border-slate-100 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-800">{studentName}</p>
+                        <p className="text-xs text-slate-400">{formatDate(dispute.date)} · {dispute.dispute?.reason}</p>
+                      </div>
+                      <span className="font-semibold text-red-600 shrink-0">−{formatCurrency(dispute.dispute?.deductedAmount ?? 0)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <Badge variant={dispute.dispute?.status === 'resolved' ? 'success' : 'warning'} className="border-0">
+                        {dispute.dispute?.status === 'resolved' ? (dispute.dispute.paymentReversed ? 'Resolved · Reversed' : 'Resolved · Not reversed') : 'Open'}
+                      </Badge>
+                      {dispute.dispute?.status !== 'resolved' && (
+                        <Button size="sm" variant="outline" onClick={() => {
+                          setResolvingDispute(dispute)
+                          setPaymentReversed(false)
+                          setReversedAmount(String(dispute.dispute?.deductedAmount ?? ''))
+                          setResolutionNotes('')
+                        }}>Resolve</Button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!resolvingDispute} onOpenChange={(open) => { if (!open) setResolvingDispute(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Resolve class dispute</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={paymentReversed} onChange={(e) => setPaymentReversed(e.target.checked)} />
+              Payment was reversed
+            </label>
+            {paymentReversed && (
+              <div>
+                <Label htmlFor="reversed-amount">Amount reversed</Label>
+                <Input id="reversed-amount" type="number" min="0" max={resolvingDispute?.dispute?.deductedAmount ?? 0} value={reversedAmount} onChange={(e) => setReversedAmount(e.target.value)} className="mt-1.5" />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="resolution-notes">Resolution note (optional)</Label>
+              <Textarea id="resolution-notes" value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} className="mt-1.5" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResolvingDispute(null)}>Cancel</Button>
+            <Button onClick={() => resolveDispute.mutate()} disabled={resolveDispute.isPending || (paymentReversed && (reversedAmount === '' || Number(reversedAmount) < 0))}>
+              {resolveDispute.isPending ? 'Saving…' : 'Mark Resolved'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-slate-500">Monthly History</CardTitle>

@@ -179,3 +179,24 @@ export async function buildClassRecord(
     paymentWindowEnd: window.end
   };
 }
+
+export function applyClassDispute(
+  calculated: { paymentAmount: number; regularPaymentAmount: number; ptmPaymentAmount: number },
+  dispute: { raised?: boolean; deductedAmount?: number; reversedAmount?: number } | undefined
+) {
+  const originalPaymentAmount = calculated.paymentAmount;
+  const deductedAmount = dispute?.raised ? Number(dispute.deductedAmount ?? 0) : 0;
+  const reversedAmount = dispute?.raised ? Number(dispute.reversedAmount ?? 0) : 0;
+  const paymentAmount = Math.max(0, Math.min(
+    originalPaymentAmount,
+    originalPaymentAmount - deductedAmount + reversedAmount
+  ));
+  const adjustment = paymentAmount - originalPaymentAmount;
+  return {
+    ...calculated,
+    paymentAmount,
+    originalPaymentAmount,
+    regularPaymentAmount: Math.max(0, calculated.regularPaymentAmount + adjustment),
+    ptmPaymentAmount: calculated.ptmPaymentAmount,
+  };
+}

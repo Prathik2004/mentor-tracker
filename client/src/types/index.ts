@@ -21,6 +21,7 @@ export interface ClassRecord {
   countNoShow: boolean;
   schedulingType: SchedulingType;
   paymentAmount: number;
+  originalPaymentAmount: number;
   regularPaymentAmount: number;
   ptmPaymentAmount: number;
   paymentRuleSnapshot: {
@@ -33,6 +34,7 @@ export interface ClassRecord {
   paymentMonth: string;
   paymentWindowStart: string;
   paymentWindowEnd: string;
+  dispute?: ClassDispute;
   notes?: string;
   deletedAt: string | null;
   createdAt: string;
@@ -137,7 +139,21 @@ export interface CreateClassInput {
   countNoShow?: boolean;
   schedulingType: SchedulingType;
   notes?: string;
+  disputeRaised?: boolean;
+  disputeReason?: string;
+  disputeAmount?: number;
   confirmDuplicate?: boolean;
+}
+
+export interface ClassDispute {
+  raised: boolean;
+  reason?: string;
+  deductedAmount: number;
+  status: 'open' | 'resolved';
+  paymentReversed: boolean;
+  reversedAmount: number;
+  resolvedAt?: string | null;
+  resolutionNotes?: string;
 }
 
 export interface CreateStudentInput {

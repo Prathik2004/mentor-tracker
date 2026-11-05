@@ -27,3 +27,9 @@ export const classesApi = {
   delete: (id: string) => api.delete<{ message: string; class: ClassRecord }>(`/classes/${id}`),
   restore: (id: string) => api.post<ClassRecord>(`/classes/${id}/restore`, {}),
 };
+
+export const disputesApi = {
+  getAll: (month?: string) => api.get<ClassRecord[]>(`/disputes${month ? `?month=${encodeURIComponent(month)}` : ''}`),
+  resolve: (classId: string, data: { paymentReversed: boolean; reversedAmount: number; resolutionNotes?: string }) =>
+    api.put<ClassRecord>(`/disputes/${classId}/resolve`, data),
+};

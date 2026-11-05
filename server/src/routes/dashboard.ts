@@ -432,6 +432,7 @@ router.get('/monthly-history', async (req: Request, res: Response) => {
 router.get('/insights/:month', async (req: Request, res: Response) => {
   try {
     const month = String(req.params.month);
+    const ownerId = new mongoose.Types.ObjectId(getUserId(req));
     const [year, monthNum] = month.split('-').map(Number);
 
     // Previous month
@@ -443,7 +444,7 @@ router.get('/insights/:month', async (req: Request, res: Response) => {
     }
     const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
-    const baseFilter = { deletedAt: null };
+    const baseFilter = { deletedAt: null, ownerId };
 
     const [
       currentStats,

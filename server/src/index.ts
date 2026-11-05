@@ -16,6 +16,7 @@ import dashboardRouter from './routes/dashboard';
 import reportsRouter from './routes/reports';
 import incentiveTypesRouter from './routes/incentiveTypes';
 import deductionsRouter from './routes/deductions';
+import disputesRouter from './routes/disputes';
 import authRouter from './routes/auth';
 import { requireAuth } from './middleware/auth';
 dotenv.config();
@@ -39,6 +40,7 @@ app.use('/api/dashboard', requireAuth, dashboardRouter);
 app.use('/api/reports', requireAuth, reportsRouter);
 app.use('/api/incentive-types', requireAuth, incentiveTypesRouter);
 app.use('/api/deductions', requireAuth, deductionsRouter);
+app.use('/api/disputes', requireAuth, disputesRouter);
 
 // Health check — used by Render's health checks and external uptime pingers
 app.get('/api/health', (_req, res) => {
@@ -77,7 +79,10 @@ if (fs.existsSync(path.join(distPath, 'index.html'))) {
 // Start HTTP immediately and connect to MongoDB in the background, so the health
 // endpoint always responds (and reflects DB state) even while Mongo is warming up.
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mentor-tracker')
+  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mentor-tracker', {
+    serverSelectionTimeoutMS: 5000,
+    connectTimeoutMS: 5000,
+  })
   .then(() => {
     console.log('Connected to MongoDB');
   })
