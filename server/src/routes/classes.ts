@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import Class from '../models/Class';
 import Student from '../models/Student';
+import Dispute from '../models/Dispute';
 import { applyClassDispute, buildClassRecord } from '../utils/paymentCalculator';
 import { getUserId } from '../middleware/auth';
 
@@ -198,6 +199,17 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     await classRecord.save();
+    if (dispute) {
+      await Dispute.create({
+        ownerId,
+        classId: classRecord._id,
+        reason: dispute.reason,
+        deductedAmount: dispute.deductedAmount,
+        status: dispute.status,
+        paymentReversed: dispute.paymentReversed,
+        reversedAmount: dispute.reversedAmount,
+      });
+    }
     const populated = await classRecord.populate('studentId', 'name course');
     res.status(201).json(populated);
   } catch (err) {
@@ -243,7 +255,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       if (dispute?.raised && (!dispute.reason || !Number.isFinite(dispute.deductedAmount) || dispute.deductedAmount < 0 || dispute.deductedAmount > calculated.paymentAmount)) {
         return res.status(400).json({ error: 'A reason and a valid deduction amount within the class payment are required' });
       }
-      Object.assign(updates, applyClassDispute(calculated, dispute), { dispute });
+      Object.assign(updates, applyClassDispute(calculated, dispute), { dispute: dispute ?? null });
     } else if (disputeRaised !== undefined) {
       const gross = existing.originalPaymentAmount || existing.paymentAmount;
       const dispute = disputeRaised ? {
@@ -260,7 +272,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       Object.assign(updates, {
         paymentAmount: Math.max(0, Math.min(gross, gross - (dispute?.deductedAmount ?? 0))),
         originalPaymentAmount: gross,
-        dispute,
+        dispute: dispute ?? null,
       });
     }
 
@@ -303,6 +315,28 @@ router.put('/:id', async (req: Request, res: Response) => {
     ).populate('studentId', 'name course');
 
     if (!classRecord) return res.status(404).json({ error: 'Class not found' });
+    if (disputeRaised !== undefined) {
+      if (updates.dispute?.raised) {
+        await Dispute.findOneAndUpdate(
+          { ownerId, classId: classRecord._id },
+          {
+            $set: {
+              reason: updates.dispute.reason,
+              deductedAmount: updates.dispute.deductedAmount,
+              status: 'open',
+              paymentReversed: false,
+              reversedAmount: 0,
+              resolvedAt: null,
+              resolutionNotes: undefined,
+            },
+            $setOnInsert: { ownerId, classId: classRecord._id },
+          },
+          { upsert: true, new: true, runValidators: true }
+        );
+      } else {
+        await Dispute.deleteOne({ ownerId, classId: classRecord._id });
+      }
+    }
     res.json(classRecord);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update class' });
